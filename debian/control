@@ -1,0 +1,48 @@
+Source: communi
+Section: net
+Priority: optional
+Maintainer: Jan Kaluza <hanzz.k@gmail.com>
+Uploaders: Jan Kaluza <hanzz.k@gmail.com>
+Build-Depends: debhelper (>= 7), libssl-dev (>= 0.9.8g), libqt4-dev (>= 4.5.0)
+Standards-Version: 3.9.3
+Homepage: http://communi.github.com/
+
+Package: libcommuni
+Architecture: any
+Section: net
+Priority: optional
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: IRC library
+ Communi provides convenient classes for establishing connections
+ to IRC servers, handling incoming messages, and sending commands.
+
+
+Package: libcommuni-dev
+Architecture: any
+Section: libdevel
+Priority: optional
+Depends: libcommuni (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
+Description: IRC library (development files)
+ Communi provides convenient classes for establishing connections
+ to IRC servers, handling incoming messages, and sending commands.
+ .
+ This package contains the header development files and programs for 
+ developing with Communi.
+
+Package: communi
+Architecture: any
+Section: net
+Priority: optional
+Depends: libcommuni (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
+Description: IRC client
+ Communi provides convenient classes for establishing connections
+ to IRC servers, handling incoming messages, and sending commands.
+
+Package: communi-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Depends: communi (= ${binary:Version}), ${misc:Depends}
+Description: IRC client/library (debugging symbols)
+ This package contains the debugging symbols for debugging Communi
+ and libcommuni applications.

@@ -1,0 +1,3 @@
+/usr/lib/*/libCommuni.so.*
+/usr/lib/*/qt4/imports/Communi/libcommuniplugin.so
+/usr/lib/*/qt4/imports/Communi/qmldir
