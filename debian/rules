@@ -12,6 +12,8 @@ build: configure
 
 override_dh_auto_configure:
 override_dh_auto_test:
+override_dh_strip:
+	dh_strip --dbg-package=libcommuni-dbg
 
 install: build
 	dh_testroot
