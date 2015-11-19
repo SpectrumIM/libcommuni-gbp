@@ -29,20 +29,11 @@ Description: IRC library (development files)
  This package contains the header development files and programs for 
  developing with Communi.
 
-Package: communi
-Architecture: any
-Section: net
-Priority: optional
-Depends: libcommuni (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
-Description: IRC client
- Communi provides convenient classes for establishing connections
- to IRC servers, handling incoming messages, and sending commands.
-
-Package: communi-dbg
+Package: libcommuni-dbg
 Architecture: any
 Section: debug
 Priority: extra
 Depends: communi (= ${binary:Version}), ${misc:Depends}
-Description: IRC client/library (debugging symbols)
- This package contains the debugging symbols for debugging Communi
+Description: IRC library (debugging symbols)
+ This package contains the debugging symbols for debugging
  and libcommuni applications.
