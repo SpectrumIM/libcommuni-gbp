@@ -1,4 +1,5 @@
 /usr/lib/*/libIrcCore.so
+/usr/lib/*/libIrcModel.so
 /usr/lib/*/libIrcUtil.so
 /usr/include
 /usr/share/qt4/mkspecs/features
