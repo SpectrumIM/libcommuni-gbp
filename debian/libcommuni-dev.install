@@ -1,3 +1,4 @@
-/usr/lib/*/libCommuni.so
+/usr/lib/*/libIrcCore.so
+/usr/lib/*/libIrcUtil.so
 /usr/include
 /usr/share/qt4/mkspecs/features
