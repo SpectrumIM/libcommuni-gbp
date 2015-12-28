@@ -33,7 +33,7 @@ Package: libcommuni-dbg
 Architecture: any
 Section: debug
 Priority: extra
-Depends: communi (= ${binary:Version}), ${misc:Depends}
+Depends: libcommuni (= ${binary:Version}), ${misc:Depends}
 Description: IRC library (debugging symbols)
  This package contains the debugging symbols for debugging
  and libcommuni applications.
