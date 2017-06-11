@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2015 The Communi Project
+ * Copyright (C) 2008-2016 The Communi Project
  *
  * This example is free, and not covered by the BSD license. There is no
  * restriction applied to their modification, redistribution, using and so on.
@@ -26,8 +26,8 @@ int main(int argc, char* argv[])
     connection.setUserName("communi");
     connection.setNickName(QString("Minimal%1").arg(qrand() % 9999));
     connection.setRealName(QString("Communi %1 minimal example").arg(Irc::version()));
-    connection.sendCommand(IrcCommand::createJoin("#communi"));
-    connection.sendCommand(IrcCommand::createMessage("#communi", "Hi, kthxbye!"));
+    connection.sendCommand(IrcCommand::createJoin("#botwar"));
+    connection.sendCommand(IrcCommand::createMessage("#botwar", "Hi, kthxbye!"));
     connection.sendCommand(IrcCommand::createQuit());
     connection.open();
 //! [minimal]

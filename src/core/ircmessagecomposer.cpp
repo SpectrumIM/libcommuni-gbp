@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2008-2015 The Communi Project
+  Copyright (C) 2008-2016 The Communi Project
 
   You may use this file under the terms of BSD license as follows:
 
@@ -146,6 +146,11 @@ void IrcMessageComposer::composeMessage(IrcNumericMessage* message)
         break;
 
     case Irc::RPL_AWAY:
+        if (!d.messages.isEmpty() && d.messages.top()->type() == IrcMessage::Whois) {
+            replaceParam(9, message->parameters().value(2)); // away reason
+            break;
+        }
+        // flow through
     case Irc::RPL_UNAWAY:
     case Irc::RPL_NOWAWAY:
         d.messages.push(new IrcAwayMessage(d.connection));
@@ -173,7 +178,8 @@ void IrcMessageComposer::composeMessage(IrcNumericMessage* message)
                                                       << QString()   // since
                                                       << QString()   // idle
                                                       << QString()   // secure
-                                                      << QString()); // channels
+                                                      << QString()   // channels
+                                                      << QString()); // away reason
         break;
 
     case Irc::RPL_WHOWASUSER:
@@ -230,18 +236,20 @@ void IrcMessageComposer::finishCompose(IrcMessage* message)
     if (!d.messages.isEmpty()) {
         IrcMessage* composed = d.messages.pop();
         composed->setTimeStamp(message->timeStamp());
-        if (message->flags() & IrcMessage::Implicit)
-            composed->setFlags(IrcMessage::Implicit);
+        if (message->testFlag(IrcMessage::Implicit))
+            composed->setFlag(IrcMessage::Implicit);
         emit messageComposed(composed);
     }
 }
 
 void IrcMessageComposer::replaceParam(int index, const QString& param)
 {
-    QStringList params = d.messages.top()->parameters();
-    if (index < params.count())
-        params.replace(index, param);
-    d.messages.top()->setParameters(params);
+    if (!d.messages.isEmpty()) {
+        QStringList params = d.messages.top()->parameters();
+        if (index < params.count())
+            params.replace(index, param);
+        d.messages.top()->setParameters(params);
+    }
 }
 #endif // IRC_DOXYGEN
 

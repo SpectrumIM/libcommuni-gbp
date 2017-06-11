@@ -1,3 +1,26 @@
+3.5.0
+-----
+- General
+  - Added support for debug levels and filters
+- IrcCore
+  - Added IrcCommand::network
+  - Added IrcBatchMessage
+  - Added IrcConnection::ctcpReplies
+  - Added IrcMessage::tag(name)
+  - Added IrcMessage::setTag(name, value)
+  - Added IrcMessage::parameter(index)
+  - Added IrcMessage::setParameter(index, parameter)
+  - Added IrcMessage::implicit
+  - Added Irc::secureSupported
+  - Added Irc::supportedSaslMechanisms
+  - Deprecated IrcConnection::secureSupported
+  - Deprecated IrcConnection::supportedSaslMechanisms
+  - Added Irc::supportedCapabilities
+  - Added IrcMessage::clone()
+  - Added IrcMessage::testFlag()
+  - Added IrcMessage::setFlag()
+  - Added IrcWhoisMessage::awayReason
+
 3.4.0
 -----
 - IrcCore

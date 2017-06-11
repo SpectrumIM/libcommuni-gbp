@@ -2,4 +2,7 @@
 # Communi
 ######################################################################
 
-IRC_VERSION = 3.5.0
+SOURCES += tst_irccommandqueue.cpp
+
+include(../shared/shared.pri)
+include(../auto.pri)

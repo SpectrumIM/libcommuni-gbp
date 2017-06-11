@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2015 The Communi Project
+ * Copyright (C) 2008-2016 The Communi Project
  *
  * This example is free, and not covered by the BSD license. There is no
  * restriction applied to their modification, redistribution, using and so on.
@@ -52,7 +52,7 @@ int main(int argc, char* argv[])
         }
     }
     if (!joined)
-        bot.join("#communi");
+        bot.join("#botwar");
 
     bot.open();
     return app.exec();

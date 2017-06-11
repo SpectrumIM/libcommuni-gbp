@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2008-2015 The Communi Project
+  Copyright (C) 2008-2016 The Communi Project
 
   You may use this file under the terms of BSD license as follows:
 
@@ -80,6 +80,11 @@ class IrcMessagePrivate
 public:
     IrcMessagePrivate();
 
+    static IrcMessagePrivate* get(IrcMessage* msg)
+    {
+        return msg->d_func();
+    }
+
     QString prefix() const;
     void setPrefix(const QString& prefix);
 
@@ -110,8 +115,8 @@ public:
     QByteArray encoding;
     mutable int flags;
     IrcMessageData data;
+    QList<IrcMessage*> batch;
 
-private:
     mutable QString m_nick, m_ident, m_host;
     mutable IrcExplicitValue<QString> m_prefix;
     mutable IrcExplicitValue<QString> m_command;

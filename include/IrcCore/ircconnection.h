@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2008-2015 The Communi Project
+  Copyright (C) 2008-2016 The Communi Project
 
   You may use this file under the terms of BSD license as follows:
 
@@ -70,6 +70,7 @@ class IRC_CORE_EXPORT IrcConnection : public QObject
     Q_PROPERTY(bool secureSupported READ isSecureSupported)
     Q_PROPERTY(QString saslMechanism READ saslMechanism WRITE setSaslMechanism NOTIFY saslMechanismChanged)
     Q_PROPERTY(QStringList supportedSaslMechanisms READ supportedSaslMechanisms CONSTANT)
+    Q_PROPERTY(QVariantMap ctcpReplies READ ctcpReplies WRITE setCtcpReplies NOTIFY ctcpRepliesChanged)
     Q_PROPERTY(IrcNetwork* network READ network CONSTANT)
     Q_PROPERTY(IrcProtocol* protocol READ protocol WRITE setProtocol)
     Q_ENUMS(Status)
@@ -145,6 +146,9 @@ public:
 
     static QStringList supportedSaslMechanisms();
 
+    QVariantMap ctcpReplies() const;
+    void setCtcpReplies(const QVariantMap& replies);
+
     IrcNetwork* network() const;
 
     IrcProtocol* protocol() const;
@@ -187,6 +191,7 @@ Q_SIGNALS:
 
     void accountMessageReceived(IrcAccountMessage* message);
     void awayMessageReceived(IrcAwayMessage* message);
+    void batchMessageReceived(IrcBatchMessage* message);
     void capabilityMessageReceived(IrcCapabilityMessage* message);
     void errorMessageReceived(IrcErrorMessage* message);
     void hostChangeMessageReceived(IrcHostChangeMessage* message);
@@ -219,11 +224,11 @@ Q_SIGNALS:
     void nickNamesChanged(const QStringList& names);
     void displayNameChanged(const QString& name);
     void userDataChanged(const QVariantMap& data);
-
     void reconnectDelayChanged(int seconds);
     void enabledChanged(bool enabled);
     void secureChanged(bool secure);
     void saslMechanismChanged(const QString& mechanism);
+    void ctcpRepliesChanged(const QVariantMap& replies);
 
     void destroyed(IrcConnection* connection);
 

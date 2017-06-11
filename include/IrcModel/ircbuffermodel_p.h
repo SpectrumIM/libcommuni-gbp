@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2008-2015 The Communi Project
+  Copyright (C) 2008-2016 The Communi Project
 
   You may use this file under the terms of BSD license as follows:
 
@@ -60,9 +60,13 @@ public:
     bool renameBuffer(const QString& from, const QString& to);
     void promoteBuffer(IrcBuffer* buffer);
 
+    void restoreBuffer(IrcBuffer* buffer);
+    QVariantMap saveBuffer(IrcBuffer* buffer) const;
+
     bool processMessage(const QString& title, IrcMessage* message, bool create = false);
 
     void _irc_connected();
+    void _irc_initialized();
     void _irc_disconnected();
     void _irc_bufferDestroyed(IrcBuffer* buffer);
 
@@ -80,7 +84,7 @@ public:
     QList<IrcBuffer*> bufferList;
     QMap<QString, IrcBuffer*> bufferMap;
     QHash<QString, QString> keys;
-    QVariantList bufferStates;
+    QVariantMap bufferStates;
     QStringList channels;
     Irc::SortMethod sortMethod;
     Qt::SortOrder sortOrder;

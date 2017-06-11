@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2015 The Communi Project
+ * Copyright (C) 2008-2016 The Communi Project
  *
  * This example is free, and not covered by the BSD license. There is no
  * restriction applied to their modification, redistribution, using and so on.
@@ -9,6 +9,11 @@
 
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
+
+#ifdef QT_STATIC
+#include <QtPlugin>
+Q_IMPORT_PLUGIN(CommuniPlugin)
+#endif // QT_STATIC
 
 int main(int argc, char* argv[])
 {

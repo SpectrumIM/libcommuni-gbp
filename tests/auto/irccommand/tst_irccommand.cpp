@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2015 The Communi Project
+ * Copyright (C) 2008-2016 The Communi Project
  *
  * This test is free, and not covered by the BSD license. There is no
  * restriction applied to their modification, redistribution, using and so on.
@@ -27,6 +27,8 @@ private slots:
 
     void testConversion();
 
+    void testConnection();
+
     void testAdmin();
     void testAway();
     void testCapability();
@@ -41,6 +43,7 @@ private slots:
     void testList();
     void testMessage();
     void testMode();
+    void testMonitor();
     void testMotd();
     void testNames();
     void testNick();
@@ -69,6 +72,8 @@ void tst_IrcCommand::testDefaults()
     QVERIFY(cmd.parameters().isEmpty());
     QCOMPARE(cmd.type(), IrcCommand::Custom);
     QCOMPARE(cmd.encoding(), QByteArray("UTF-8"));
+    QVERIFY(!cmd.connection());
+    QVERIFY(!cmd.network());
 
     QTest::ignoreMessage(QtWarningMsg, "Reimplement IrcCommand::toString() for IrcCommand::Custom");
     QVERIFY(cmd.toString().isEmpty());
@@ -117,6 +122,23 @@ void tst_IrcCommand::testConversion()
     QCOMPARE(msg->prefix(), QString("prefix"));
     QCOMPARE(msg->property("target").toString(), QString("target"));
     QCOMPARE(msg->property("content").toString(), QString("foo bar"));
+}
+
+void tst_IrcCommand::testConnection()
+{
+    IrcConnection* connection = new IrcConnection(this);
+    IrcCommand command(connection);
+    QVERIFY(!command.connection());
+    QVERIFY(!command.network());
+
+    connection->sendCommand(&command);
+    QCOMPARE(command.connection(), connection);
+    QCOMPARE(command.network(), connection->network());
+
+    command.setParent(0);
+    delete connection;
+    QVERIFY(!command.connection());
+    QVERIFY(!command.network());
 }
 
 void tst_IrcCommand::testAdmin()
@@ -232,6 +254,14 @@ void tst_IrcCommand::testJoin()
     QVERIFY(cmd2->toString().contains(QRegExp("\\bJOIN\\b")));
     QVERIFY(cmd2->toString().contains(QRegExp("\\bchan1\\b")));
     QVERIFY(cmd2->toString().contains(QRegExp("\\bchan2\\b")));
+
+    QScopedPointer<IrcCommand> cmd3(IrcCommand::createJoin(QStringList() << "chan1" << "chan2", QStringList() << "key1" << "key2"));
+    QVERIFY(cmd3.data());
+
+    QCOMPARE(cmd3->type(), IrcCommand::Join);
+    QVERIFY(cmd3->toString().contains(QRegExp("\\bJOIN\\b")));
+    QVERIFY(cmd3->toString().contains(QRegExp("\\bchan1,chan2\\b")));
+    QVERIFY(cmd3->toString().contains(QRegExp("\\bkey1,key2\\b")));
 }
 
 void tst_IrcCommand::testKick()
@@ -287,6 +317,24 @@ void tst_IrcCommand::testMode()
     QVERIFY(cmd->toString().contains(QRegExp("\\bMODE\\b")));
     QVERIFY(cmd->toString().contains(QRegExp("\\btgt\\b")));
     QVERIFY(cmd->toString().contains(QRegExp("\\bmode\\b")));
+}
+
+void tst_IrcCommand::testMonitor()
+{
+    QScopedPointer<IrcCommand> cmd1(IrcCommand::createMonitor("+", "foo"));
+    QVERIFY(cmd1.data());
+
+    QCOMPARE(cmd1->type(), IrcCommand::Monitor);
+    QVERIFY(cmd1->toString().contains(QRegExp("\\bMONITOR\\b")));
+    QVERIFY(cmd1->toString().contains(QRegExp("\\bfoo\\b")));
+
+    QScopedPointer<IrcCommand> cmd2(IrcCommand::createMonitor("+", QStringList() << "foo" << "bar"));
+    QVERIFY(cmd2.data());
+
+    QCOMPARE(cmd2->type(), IrcCommand::Monitor);
+    QVERIFY(cmd2->toString().contains(QRegExp("\\bMONITOR\\b")));
+    QVERIFY(cmd2->toString().contains(QRegExp("\\bfoo\\b")));
+    QVERIFY(cmd2->toString().contains(QRegExp("\\bbar\\b")));
 }
 
 void tst_IrcCommand::testMotd()

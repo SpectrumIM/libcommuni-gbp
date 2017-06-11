@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2008-2015 The Communi Project
+  Copyright (C) 2008-2016 The Communi Project
 
   You may use this file under the terms of BSD license as follows:
 
@@ -33,6 +33,9 @@
 #include "ircmessage_p.h"
 #include <QMetaEnum>
 #include <QDebug>
+#ifndef QT_NO_SSL
+#include <QSslSocket>
+#endif // QT_NO_SSL
 
 IRC_BEGIN_NAMESPACE
 
@@ -42,10 +45,79 @@ IRC_BEGIN_NAMESPACE
  */
 
 /*!
-    \namespace Irc
+    \class Irc
     \ingroup core
     \brief Miscellaneous identifiers used throughout the library.
  */
+
+/*!
+    \since 3.5
+    \property bool Irc::secureSupported
+    This property holds whether SSL is supported.
+
+    The value may be \c false for the following reasons:
+    \li Qt was built without SSL support (\c QT_NO_SSL is defined), or
+    \li The platform does not support SSL (QSslSocket::supportsSsl() returns \c false).
+
+    \par Access function:
+    \li static bool <b>isSecureSupported</b>()
+
+    \sa IrcConnection::secure, QSslSocket::supportsSsl()
+ */
+bool Irc::isSecureSupported()
+{
+#ifdef QT_NO_SSL
+    return false;
+#else
+    return QSslSocket::supportsSsl();
+#endif
+}
+
+/*!
+    \since 3.5
+
+    This property holds the list of supported SASL (Simple Authentication and Security Layer) mechanisms.
+
+    \par Access function:
+    \li static QStringList <b>supportedSaslMechanisms</b>()
+
+    \sa IrcConnection::saslMechanism, \ref ircv3
+ */
+QStringList Irc::supportedSaslMechanisms()
+{
+    return QStringList() << QLatin1String("PLAIN");
+}
+
+/*!
+    \since 3.5
+
+    This property holds the list of supported capabilities.
+
+    These capabilities are guaranteed to be compatible with the framework. In order to
+    easily enable all possible supported capabilities, assign Irc::supportedCapabilities
+    to IrcNetwork::requestedCapabilities.
+
+    \par Access function:
+    \li static QStringList <b>supportedCapabilities</b>()
+
+    \sa \ref capabilities, \ref ircv3
+ */
+QStringList Irc::supportedCapabilities()
+{
+    return QStringList() << QLatin1String("account-notify")
+                         << QLatin1String("account-tag")
+                         << QLatin1String("away-notify")
+                         << QLatin1String("batch")
+                         << QLatin1String("cap-notify")
+                         << QLatin1String("chghost")
+                         << QLatin1String("echo-message")
+                         << QLatin1String("extended-join")
+                         << QLatin1String("invite-notify")
+                         << QLatin1String("multi-prefix")
+                         << QLatin1String("sasl")
+                         << QLatin1String("server-time")
+                         << QLatin1String("userhost-in-names");
+}
 
 /*!
     Returns the version number of Communi at run-time as a string (for example, "1.2.3").

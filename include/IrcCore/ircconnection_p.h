@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2008-2015 The Communi Project
+  Copyright (C) 2008-2016 The Communi Project
 
   You may use this file under the terms of BSD license as follows:
 
@@ -70,7 +70,7 @@ public:
     void setStatus(IrcConnection::Status status);
     void setInfo(const QHash<QString, QString>& info);
 
-    void receiveMessage(IrcMessage* msg);
+    bool receiveMessage(IrcMessage* msg);
     IrcCommand* createCtcpReply(IrcPrivateMessage* request);
 
     static IrcConnectionPrivate* get(const IrcConnection* connection)
@@ -96,6 +96,7 @@ public:
     QVariantMap userData;
     QTimer reconnecter;
     QString saslMechanism;
+    QVariantMap ctcpReplies;
     bool enabled;
     IrcConnection::Status status;
     QList<QByteArray> pendingData;

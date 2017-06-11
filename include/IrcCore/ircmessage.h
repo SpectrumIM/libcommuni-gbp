@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2008-2015 The Communi Project
+  Copyright (C) 2008-2016 The Communi Project
 
   You may use this file under the terms of BSD license as follows:
 
@@ -51,6 +51,7 @@ class IRC_CORE_EXPORT IrcMessage : public QObject
     Q_PROPERTY(IrcNetwork* network READ network)
     Q_PROPERTY(Type type READ type)
     Q_PROPERTY(bool own READ isOwn)
+    Q_PROPERTY(bool implicit READ isImplicit)
     Q_PROPERTY(Flags flags READ flags)
     Q_PROPERTY(bool valid READ isValid)
     Q_PROPERTY(QString command READ command)
@@ -90,7 +91,8 @@ public:
         Away,
         Whois,
         Whowas,
-        HostChange
+        HostChange,
+        Batch
     };
 
     enum Flag {
@@ -110,10 +112,15 @@ public:
     IrcNetwork* network() const;
 
     Type type() const;
+
     bool isOwn() const;
+    bool isImplicit() const;
 
     Flags flags() const;
     void setFlags(Flags flags);
+
+    Q_INVOKABLE bool testFlag(Flag flag) const;
+    Q_INVOKABLE void setFlag(Flag flag, bool on = true);
 
     QString command() const;
     void setCommand(const QString& command);
@@ -129,6 +136,9 @@ public:
     QStringList parameters() const;
     void setParameters(const QStringList& parameters);
 
+    QString parameter(int index) const;
+    void setParameter(int index, const QString& parameter);
+
     virtual bool isValid() const;
 
     QDateTime timeStamp() const;
@@ -140,9 +150,13 @@ public:
     QVariantMap tags() const;
     void setTags(const QVariantMap& tags);
 
+    QVariant tag(const QString& name) const;
+    void setTag(const QString& name, const QVariant& tag);
+
     Q_INVOKABLE QByteArray toData() const;
     Q_INVOKABLE static IrcMessage* fromData(const QByteArray& data, IrcConnection* connection);
     Q_INVOKABLE static IrcMessage* fromParameters(const QString& prefix, const QString& command, const QStringList& parameters, IrcConnection* connection);
+    Q_INVOKABLE IrcMessage* clone(QObject *parent = 0) const;
 
 protected:
     QScopedPointer<IrcMessagePrivate> d_ptr;
@@ -186,6 +200,27 @@ public:
 
 private:
     Q_DISABLE_COPY(IrcAwayMessage)
+};
+
+class IRC_CORE_EXPORT IrcBatchMessage : public IrcMessage
+{
+    Q_OBJECT
+    Q_PROPERTY(QString tag READ tag)
+    Q_PROPERTY(QString batch READ batch)
+    Q_PROPERTY(QList<IrcMessage*> messages READ messages)
+
+public:
+    Q_INVOKABLE explicit IrcBatchMessage(IrcConnection* connection);
+
+    QString tag() const;
+    QString batch() const;
+
+    QList<IrcMessage*> messages() const;
+
+    bool isValid() const;
+
+private:
+    Q_DISABLE_COPY(IrcBatchMessage)
 };
 
 class IRC_CORE_EXPORT IrcCapabilityMessage : public IrcMessage
@@ -547,6 +582,7 @@ class IRC_CORE_EXPORT IrcWhoisMessage : public IrcMessage
     Q_PROPERTY(int idle READ idle)
     Q_PROPERTY(bool secure READ isSecure)
     Q_PROPERTY(QStringList channels READ channels)
+    Q_PROPERTY(QString awayReason READ awayReason)
 
 public:
     Q_INVOKABLE explicit IrcWhoisMessage(IrcConnection* connection);
@@ -559,8 +595,8 @@ public:
     QDateTime since() const;
     int idle() const;
     bool isSecure() const;
-    QString from() const;
     QStringList channels() const;
+    QString awayReason() const;
 
     bool isValid() const;
 
@@ -628,6 +664,7 @@ Q_DECLARE_METATYPE(IRC_PREPEND_NAMESPACE(IrcMessage::Type))
 Q_DECLARE_METATYPE(IRC_PREPEND_NAMESPACE(IrcMessage*))
 Q_DECLARE_METATYPE(IRC_PREPEND_NAMESPACE(IrcAccountMessage*))
 Q_DECLARE_METATYPE(IRC_PREPEND_NAMESPACE(IrcAwayMessage*))
+Q_DECLARE_METATYPE(IRC_PREPEND_NAMESPACE(IrcBatchMessage*))
 Q_DECLARE_METATYPE(IRC_PREPEND_NAMESPACE(IrcCapabilityMessage*))
 Q_DECLARE_METATYPE(IRC_PREPEND_NAMESPACE(IrcErrorMessage*))
 Q_DECLARE_METATYPE(IRC_PREPEND_NAMESPACE(IrcHostChangeMessage*))

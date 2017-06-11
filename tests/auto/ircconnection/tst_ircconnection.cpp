@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2015 The Communi Project
+ * Copyright (C) 2008-2016 The Communi Project
  *
  * This test is free, and not covered by the BSD license. There is no
  * restriction applied to their modification, redistribution, using and so on.
@@ -17,7 +17,7 @@
 #include <QtCore/QRegExp>
 #include <QtCore/QTextCodec>
 #include <QtCore/QScopedPointer>
-#ifndef QT_NO_OPENSSL
+#ifndef QT_NO_SSL
 #include <QtNetwork/QSslSocket>
 #endif
 
@@ -91,7 +91,12 @@ private slots:
     void testConnection();
     void testMessages();
     void testMessageFlags();
+    void testStatusPrefixes();
     void testMessageComposer();
+    void testMessageComposerCrash_data();
+    void testMessageComposerCrash();
+    void testBatch();
+    void testServerTime();
 
     void testSendCommand();
     void testSendData();
@@ -103,6 +108,10 @@ private slots:
     void testWarnings();
 
     void testCtcp();
+    void testClone();
+    void testSaveRestore();
+    void testSignals();
+    void testServers();
 };
 
 void tst_IrcConnection::testDefaults()
@@ -347,7 +356,7 @@ void tst_IrcConnection::testSocket_data()
 
     QTest::newRow("null") << static_cast<QAbstractSocket*>(0);
     QTest::newRow("tcp") << static_cast<QAbstractSocket*>(new QTcpSocket(this));
-#ifndef QT_NO_OPENSSL
+#ifndef QT_NO_SSL
     QTest::newRow("ssl") << static_cast<QAbstractSocket*>(new QSslSocket(this));
 #endif
 }
@@ -369,13 +378,13 @@ void tst_IrcConnection::testSecure()
     QVERIFY(spy.isValid());
     QVERIFY(!connection.isSecure());
 
-#ifdef QT_NO_OPENSSL
+#ifdef QT_NO_SSL
     QTest::ignoreMessage(QtWarningMsg, "IrcConnection::setSecure(): the Qt build does not support SSL");
 #endif
 
     connection.setSecure(true);
 
-#ifndef QT_NO_OPENSSL
+#ifndef QT_NO_SSL
     QVERIFY(connection.isSecure());
     QVERIFY(connection.socket()->inherits("QSslSocket"));
     QCOMPARE(spy.count(), 1);
@@ -389,7 +398,7 @@ void tst_IrcConnection::testSecure()
     connection.setSecure(false);
     QVERIFY(!connection.isSecure());
     QVERIFY(!connection.socket()->inherits("QSslSocket"));
-#ifndef QT_NO_OPENSSL
+#ifndef QT_NO_SSL
     QCOMPARE(spy.count(), 2);
     QVERIFY(!spy.last().last().toBool());
 #else
@@ -509,7 +518,7 @@ void tst_IrcConnection::testNoSasl()
     QVERIFY(written.contains("CAP END"));
 }
 
-#ifndef QT_NO_OPENSSL
+#ifndef QT_NO_SSL
 class SslSocket : public QSslSocket
 {
     Q_OBJECT
@@ -525,11 +534,11 @@ public slots:
         QSslSocket::startClientEncryption();
     }
 };
-#endif // !QT_NO_OPENSSL
+#endif // !QT_NO_SSL
 
 void tst_IrcConnection::testSsl()
 {
-#ifndef QT_NO_OPENSSL
+#ifndef QT_NO_SSL
     SslSocket* socket = new SslSocket(connection);
     connection->setSocket(socket);
     QCOMPARE(connection->socket(), socket);
@@ -538,7 +547,7 @@ void tst_IrcConnection::testSsl()
     QVERIFY(waitForOpened());
 
     QVERIFY(socket->clientEncryptionStarted);
-#endif // !QT_NO_OPENSSL
+#endif // !QT_NO_SSL
 }
 
 void tst_IrcConnection::testOpen()
@@ -732,10 +741,8 @@ void tst_IrcConnection::testStatus()
     // trigger an error _after_ quit -> no automatic reconnect
     connection->quit();
     serverSocket->close();
-    QVERIFY(clientSocket->waitForDisconnected(100));
     QVERIFY(!connection->isConnected());
     QVERIFY(!connection->isActive());
-    QCOMPARE(statusSpy.at(statusCount++).at(0).value<IrcConnection::Status>(), IrcConnection::Closing);
     QCOMPARE(statusSpy.at(statusCount++).at(0).value<IrcConnection::Status>(), IrcConnection::Closed);
     QCOMPARE(statusSpy.count(), statusCount);
 }
@@ -843,8 +850,12 @@ void tst_IrcConnection::testMessages()
     qRegisterMetaType<QString*>();
 
     QSignalSpy messageSpy(connection, SIGNAL(messageReceived(IrcMessage*)));
+    QSignalSpy accountMessageSpy(connection, SIGNAL(accountMessageReceived(IrcAccountMessage*)));
+    QSignalSpy awayMessageSpy(connection, SIGNAL(awayMessageReceived(IrcAwayMessage*)));
+    QSignalSpy batchMessageSpy(connection, SIGNAL(batchMessageReceived(IrcBatchMessage*)));
     QSignalSpy capabilityMessageSpy(connection, SIGNAL(capabilityMessageReceived(IrcCapabilityMessage*)));
     QSignalSpy errorMessageSpy(connection, SIGNAL(errorMessageReceived(IrcErrorMessage*)));
+    QSignalSpy hostChangeMessageSpy(connection, SIGNAL(hostChangeMessageReceived(IrcHostChangeMessage*)));
     QSignalSpy inviteMessageSpy(connection, SIGNAL(inviteMessageReceived(IrcInviteMessage*)));
     QSignalSpy joinMessageSpy(connection, SIGNAL(joinMessageReceived(IrcJoinMessage*)));
     QSignalSpy kickMessageSpy(connection, SIGNAL(kickMessageReceived(IrcKickMessage*)));
@@ -860,11 +871,17 @@ void tst_IrcConnection::testMessages()
     QSignalSpy privateMessageSpy(connection, SIGNAL(privateMessageReceived(IrcPrivateMessage*)));
     QSignalSpy quitMessageSpy(connection, SIGNAL(quitMessageReceived(IrcQuitMessage*)));
     QSignalSpy topicMessageSpy(connection, SIGNAL(topicMessageReceived(IrcTopicMessage*)));
+    QSignalSpy whoisMessageSpy(connection, SIGNAL(whoisMessageReceived(IrcWhoisMessage*)));
+    QSignalSpy whowasMessageSpy(connection, SIGNAL(whowasMessageReceived(IrcWhowasMessage*)));
     QSignalSpy whoReplyMessageSpy(connection, SIGNAL(whoReplyMessageReceived(IrcWhoReplyMessage*)));
 
     QVERIFY(messageSpy.isValid());
+    QVERIFY(accountMessageSpy.isValid());
+    QVERIFY(awayMessageSpy.isValid());
+    QVERIFY(batchMessageSpy.isValid());
     QVERIFY(capabilityMessageSpy.isValid());
     QVERIFY(errorMessageSpy.isValid());
+    QVERIFY(hostChangeMessageSpy.isValid());
     QVERIFY(inviteMessageSpy.isValid());
     QVERIFY(joinMessageSpy.isValid());
     QVERIFY(kickMessageSpy.isValid());
@@ -880,6 +897,8 @@ void tst_IrcConnection::testMessages()
     QVERIFY(privateMessageSpy.isValid());
     QVERIFY(quitMessageSpy.isValid());
     QVERIFY(topicMessageSpy.isValid());
+    QVERIFY(whoisMessageSpy.isValid());
+    QVERIFY(whowasMessageSpy.isValid());
     QVERIFY(whoReplyMessageSpy.isValid());
 
     int messageCount = 0;
@@ -970,6 +989,13 @@ void tst_IrcConnection::testMessages()
     QCOMPARE(messageSpy.count(), ++messageCount);
     QCOMPARE(inviteMessageSpy.count(), 1);
 
+    QVERIFY(waitForWritten(":moorcock.freenode.net 341 jpnurmi Communi84194 #communi"));
+    messageCount += 2; // RPL_INVITING + IrcInviteMessage
+    QCOMPARE(messageSpy.count(), messageCount);
+    QCOMPARE(numericMessageSpy.count(), ++numericMessageCount);
+    QCOMPARE(inviteMessageSpy.count(), 2);
+    QVERIFY(inviteMessageSpy.last().last().value<IrcInviteMessage*>()->property("reply").toBool());
+
     QVERIFY(waitForWritten(":Communi84194!ident@host NICK :communi"));
     QCOMPARE(messageSpy.count(), ++messageCount);
     QCOMPARE(nickMessageSpy.count(), 1);
@@ -1036,6 +1062,34 @@ void tst_IrcConnection::testMessages()
     QCOMPARE(messageSpy.count(), ++messageCount);
     QCOMPARE(numericMessageSpy.count(), ++numericMessageCount);
     QCOMPARE(whoReplyMessageSpy.count(), 1);
+
+    QVERIFY(waitForWritten(":nick!user@host CHGHOST newuser newhost"));
+    QCOMPARE(messageSpy.count(), ++messageCount);
+    QCOMPARE(hostChangeMessageSpy.count(), 1);
+
+    QVERIFY(waitForWritten(":nick!user@host AWAY :reason"));
+    QCOMPARE(messageSpy.count(), ++messageCount);
+    QCOMPARE(awayMessageSpy.count(), 1);
+
+    QVERIFY(waitForWritten(":nick!user@host ACCOUNT account"));
+    QCOMPARE(messageSpy.count(), ++messageCount);
+    QCOMPARE(accountMessageSpy.count(), 1);
+
+    QVERIFY(waitForWritten(":asimov.freenode.net 311 jpnurmi qtassistant jpnurmi qt/jpnurmi/bot/qtassistant * :http://doc.qt.io/qt-5"));
+    QVERIFY(waitForWritten(":asimov.freenode.net 318 jpnurmi qtassistant :End of /WHOIS list."));
+    messageCount += 3; // RPL_WHOISUSER + RPL_ENDOFWHOIS + IrcWhoisMessage
+    numericMessageCount += 2; // RPL_WHOISUSER + RPL_ENDOFWHOIS
+    QCOMPARE(messageSpy.count(), messageCount);
+    QCOMPARE(numericMessageSpy.count(), numericMessageCount);
+    QCOMPARE(whoisMessageSpy.count(), 1);
+
+    QVERIFY(waitForWritten(":asimov.freenode.net 314 jpnurmi jirssi ~jpnurmi 88.95.51.136 * :J-P Nurmi"));
+    QVERIFY(waitForWritten(":asimov.freenode.net 369 jpnurmi jirssi :End of WHOWAS"));
+    messageCount += 3; // RPL_WHOWASUSER + RPL_ENDOFWHOWAS + IrcWhowasMessage
+    numericMessageCount += 2; // RPL_WHOWASUSER + RPL_ENDOFWHOWAS
+    QCOMPARE(messageSpy.count(), messageCount);
+    QCOMPARE(numericMessageSpy.count(), numericMessageCount);
+    QCOMPARE(whowasMessageSpy.count(), 1);
 }
 
 class MsgFilter : public QObject, public IrcMessageFilter
@@ -1062,8 +1116,11 @@ public:
         ++count;
         type = message->type();
         flags = message->flags();
-        foreach (const QByteArray& property, properties.split(','))
-            values[property] = message->property(property);
+        foreach (const QByteArray& property, properties.split(',')) {
+            QVariant value = message->property(property);
+            if (!value.isNull())
+                values[property] = value;
+        }
         return false;
     }
 
@@ -1153,6 +1210,49 @@ void tst_IrcConnection::testMessageFlags()
     QCOMPARE(filter.values.value("content").toString(), QString("hi communi"));
 }
 
+void tst_IrcConnection::testStatusPrefixes()
+{
+    connection->open();
+    QVERIFY(waitForOpened());
+
+    int count = 0;
+    MsgFilter filter;
+    connection->installMessageFilter(&filter);
+
+    QVERIFY(waitForWritten(":server 001 communi :Welcome..."));
+    QCOMPARE(filter.count, ++count);
+    QCOMPARE(filter.type, IrcMessage::Numeric);
+    QCOMPARE(filter.flags, IrcMessage::None);
+
+    QVERIFY(waitForWritten(":server 005 communi STATUSMSG=@+"));
+    QCOMPARE(filter.count, ++count);
+    QCOMPARE(filter.type, IrcMessage::Numeric);
+    QCOMPARE(filter.flags, IrcMessage::None);
+
+    QVERIFY(waitForWritten(":server 375 communi :MOTD"));
+    QVERIFY(waitForWritten(":server 376 communi :End of /MOTD command."));
+    count += 3; // RPL_MOTDSTART, RPL_ENDOFMOTD, IrcMotdMessage
+    QCOMPARE(filter.count, count);
+    QCOMPARE(filter.type, IrcMessage::Motd);
+    QCOMPARE(filter.flags, IrcMessage::None);
+
+    filter.reset("target,statusPrefix,content", count);
+    QVERIFY(waitForWritten(":Guest1234!ident@host PRIVMSG +#communi :hi communi"));
+    QCOMPARE(filter.count, ++count);
+    QCOMPARE(filter.type, IrcMessage::Private);
+    QCOMPARE(filter.values.value("target").toString(), QString("#communi"));
+    QCOMPARE(filter.values.value("statusPrefix").toString(), QString("+"));
+    QCOMPARE(filter.values.value("content").toString(), QString("hi communi"));
+
+    filter.reset("target,statusPrefix,content", count);
+    QVERIFY(waitForWritten(":Guest1234!ident@host NOTICE +#communi :hi communi"));
+    QCOMPARE(filter.count, ++count);
+    QCOMPARE(filter.type, IrcMessage::Notice);
+    QCOMPARE(filter.values.value("target").toString(), QString("#communi"));
+    QCOMPARE(filter.values.value("statusPrefix").toString(), QString("+"));
+    QCOMPARE(filter.values.value("content").toString(), QString("hi communi"));
+}
+
 void tst_IrcConnection::testMessageComposer()
 {
     connection->open();
@@ -1166,7 +1266,7 @@ void tst_IrcConnection::testMessageComposer()
     QVERIFY(waitForWritten(":my.irc.ser.ver 005 communi CASEMAPPING=rfc1459 CHARSET=ascii NICKLEN=16 CHANNELLEN=50 TOPICLEN=390 ETRACE CPRIVMSG CNOTICE DEAF=D MONITOR=100 FNC TARGMAX=NAMES:1,LIST:1,KICK:1,WHOIS:1,PRIVMSG:4,NOTICE:4,ACCEPT:,MONITOR: :are supported by this server"));
     QVERIFY(waitForWritten(":my.irc.ser.ver 005 communi EXTBAN=$,arxz WHOX CLIENTVER=3.0 SAFELIST ELIST=CTU :are supported by this server"));
 
-    filter.reset("mask,ident,host,server,nick,away,servOp,realName");
+    filter.reset("mask,ident,host,server,nick,away,servOp,realName,composed");
     QVERIFY(waitForWritten(":my.irc.ser.ver 352 communi #communi ~jpnurmi qt/jpnurmi his.irc.ser.ver jpnurmi G*@ :0 J-P Nurmi"));
     QCOMPARE(filter.count, 2); // RPL_WHOREPLY + IrcWhoReply
     QCOMPARE(filter.values.value("mask").toString(), QString("#communi"));
@@ -1177,46 +1277,168 @@ void tst_IrcConnection::testMessageComposer()
     QCOMPARE(filter.values.value("away").toBool(), true);
     QCOMPARE(filter.values.value("servOp").toBool(), true);
     QCOMPARE(filter.values.value("realName").toString(), QString("J-P Nurmi"));
+    QCOMPARE(filter.values.value("composed").toBool(), true);
 
     filter.reset("realName");
     QVERIFY(waitForWritten(":my.irc.ser.ver 352 communi #communi ~jpnurmi qt/jpnurmi his.irc.ser.ver jpnurmi G*@ :0"));
     QCOMPARE(filter.values.value("realName").toString(), QString());
 
-    filter.reset("content,nick,reply,away");
-    filter.type = IrcMessage::Unknown;
+    filter.reset("content,nick,reply,away,composed");
     QVERIFY(waitForWritten(":my.irc.ser.ver 301 communi nick :gone far away"));
     QCOMPARE(filter.values.value("content").toString(), QString("gone far away"));
     QCOMPARE(filter.values.value("nick").toString(), QString("nick"));
     QVERIFY(filter.values.value("reply").toBool());
     QVERIFY(filter.values.value("away").toBool());
+    QVERIFY(filter.values.value("composed").toBool());
     QCOMPARE(filter.type, IrcMessage::Away);
 
-    filter.reset("content,nick,reply,away");
-    filter.type = IrcMessage::Unknown;
+    filter.reset("content,nick,reply,away,composed");
     QVERIFY(waitForWritten(":my.irc.ser.ver 301 communi nick"));
     QCOMPARE(filter.values.value("nick").toString(), QString("nick"));
     QCOMPARE(filter.values.value("content").toString(), QString());
     QVERIFY(filter.values.value("reply").toBool());
     QVERIFY(filter.values.value("away").toBool());
+    QVERIFY(filter.values.value("composed").toBool());
     QCOMPARE(filter.type, IrcMessage::Away);
 
-    filter.reset("content,nick,reply,away");
-    filter.type = IrcMessage::Unknown;
+    filter.reset("content,nick,reply,away,composed");
     QVERIFY(waitForWritten(":my.irc.ser.ver 305 communi :You are no longer marked as being away"));
     QCOMPARE(filter.values.value("nick").toString(), QString("communi"));
     QCOMPARE(filter.values.value("content").toString(), QString("You are no longer marked as being away"));
     QVERIFY(filter.values.value("reply").toBool());
     QVERIFY(!filter.values.value("away").toBool());
+    QVERIFY(filter.values.value("composed").toBool());
     QCOMPARE(filter.type, IrcMessage::Away);
 
-    filter.reset("content,nick,reply,away");
-    filter.type = IrcMessage::Unknown;
+    filter.reset("content,nick,reply,away,composed");
     QVERIFY(waitForWritten(":my.irc.ser.ver 306 communi :You have been marked as being away"));
     QCOMPARE(filter.values.value("nick").toString(), QString("communi"));
     QCOMPARE(filter.values.value("content").toString(), QString("You have been marked as being away"));
     QVERIFY(filter.values.value("reply").toBool());
     QVERIFY(filter.values.value("away").toBool());
+    QVERIFY(filter.values.value("composed").toBool());
     QCOMPARE(filter.type, IrcMessage::Away);
+
+    filter.reset("realName,server,info,account,address,since,idle,secure,from,channels,awayReason,valid");
+    QVERIFY(waitForWritten(":asimov.freenode.net 311 jipsu qtassistant jpnurmi qt/jpnurmi/bot/qtassistant * :http://doc.qt.io/qt-5"));
+    QVERIFY(waitForWritten(":asimov.freenode.net 319 jipsu qtassistant :+#jpnurmi"));
+    QVERIFY(waitForWritten(":asimov.freenode.net 312 jipsu qtassistant leguin.freenode.net :Umeå, SE, EU"));
+    QVERIFY(waitForWritten(":asimov.freenode.net 671 jipsu qtassistant :is using a secure connection"));
+    QVERIFY(waitForWritten(":asimov.freenode.net 301 jipsu qtassistant :gone fishing"));
+    QVERIFY(waitForWritten(":asimov.freenode.net 330 jipsu qtassistant qtaccountant :is logged in as"));
+    QVERIFY(waitForWritten(":asimov.freenode.net 378 jipsu qtassistant :is connecting from *@88.95.51.136 88.95.51.136"));
+    QVERIFY(waitForWritten(":asimov.freenode.net 317 jipsu qtassistant 15 1440706032 :seconds idle, signon time"));
+    QVERIFY(waitForWritten(":asimov.freenode.net 318 jipsu qtassistant :End of /WHOIS list."));
+    QCOMPARE(filter.values.value("realName").toString(), QString("http://doc.qt.io/qt-5"));
+    QCOMPARE(filter.values.value("server").toString(), QString("leguin.freenode.net"));
+    QCOMPARE(filter.values.value("info").toString(), QString::fromUtf8("Umeå, SE, EU"));
+    QCOMPARE(filter.values.value("account").toString(), QString("qtaccountant"));
+    QEXPECT_FAIL("", "RPL_WHOISHOST :is connecting from *@88.95.51.136 88.95.51.136", Continue);
+    QCOMPARE(filter.values.value("address").toString(), QString("88.95.51.136"));
+    QCOMPARE(filter.values.value("since").toDateTime(), QDateTime::fromTime_t(1440706032));
+    QCOMPARE(filter.values.value("idle").toInt(), 15);
+    QCOMPARE(filter.values.value("secure").toBool(), true);
+    QCOMPARE(filter.values.value("channels").toStringList(), QStringList() << "+#jpnurmi");
+    QCOMPARE(filter.values.value("awayReason").toString(), QString("gone fishing"));
+    QVERIFY(filter.values.value("valid").toBool());
+    QCOMPARE(filter.type, IrcMessage::Whois);
+
+    filter.reset("realName,server,info,account,valid");
+    QVERIFY(waitForWritten(":asimov.freenode.net 314 jipsu jirssi ~jpnurmi 88.95.51.136 * :J-P Nurmi"));
+    QVERIFY(waitForWritten(":asimov.freenode.net 312 jipsu jirssi wolfe.freenode.net :Wed Aug 26 22:11:42 2015"));
+    QVERIFY(waitForWritten(":asimov.freenode.net 330 jipsu jirssi jaccount :is logged in as"));
+    QVERIFY(waitForWritten(":asimov.freenode.net 369 jipsu jirssi :End of WHOWAS"));
+    QCOMPARE(filter.values.value("realName").toString(), QString("J-P Nurmi"));
+    QCOMPARE(filter.values.value("server").toString(), QString("wolfe.freenode.net"));
+    QCOMPARE(filter.values.value("info").toString(), QString("Wed Aug 26 22:11:42 2015"));
+    QCOMPARE(filter.values.value("account").toString(), QString("jaccount"));
+    QVERIFY(filter.values.value("valid").toBool());
+    QCOMPARE(filter.type, IrcMessage::Whowas);
+}
+
+void tst_IrcConnection::testMessageComposerCrash_data()
+{
+    QTest::addColumn<QByteArray>("data");
+
+    // unexpected replies - don't crash
+    QList<Irc::Code> codes;
+    codes << Irc::RPL_WHOISSERVER << Irc::RPL_WHOISACCOUNT << Irc::RPL_WHOISHOST << Irc::RPL_WHOISIDLE << Irc::RPL_WHOISSECURE << Irc::RPL_WHOISCHANNELS;
+    foreach (Irc::Code code, codes)
+        QTest::newRow(qPrintable(Irc::codeToString(code))) << QByteArray(":server ") + QByteArray::number(code);
+}
+
+void tst_IrcConnection::testMessageComposerCrash()
+{
+    QFETCH(QByteArray, data);
+
+    connection->open();
+    QVERIFY(waitForOpened());
+    QVERIFY(waitForWritten(data));
+}
+
+void tst_IrcConnection::testBatch()
+{
+    connection->open();
+    QVERIFY(waitForOpened());
+
+    QVERIFY(waitForWritten(":my.irc.ser.ver 001 communi :Welcome..."));
+    QVERIFY(waitForWritten(":my.irc.ser.ver 005 communi CHANTYPES=# EXCEPTS INVEX CHANMODES=eIbq,k,flj,CFLMPQScgimnprstz CHANLIMIT=#:120 PREFIX=(ov)@+ MAXLIST=bqeI:100 MODES=4 NETWORK=fake KNOCK STATUSMSG=@+ CALLERID=g :are supported by this server"));
+    QVERIFY(waitForWritten(":my.irc.ser.ver 005 communi CASEMAPPING=rfc1459 CHARSET=ascii NICKLEN=16 CHANNELLEN=50 TOPICLEN=390 ETRACE CPRIVMSG CNOTICE DEAF=D MONITOR=100 FNC TARGMAX=NAMES:1,LIST:1,KICK:1,WHOIS:1,PRIVMSG:4,NOTICE:4,ACCEPT:,MONITOR: :are supported by this server"));
+    QVERIFY(waitForWritten(":my.irc.ser.ver 005 communi EXTBAN=$,arxz WHOX CLIENTVER=3.0 SAFELIST ELIST=CTU :are supported by this server"));
+
+    QSignalSpy messageSpy(connection, SIGNAL(messageReceived(IrcMessage*)));
+    QSignalSpy batchMessageSpy(connection, SIGNAL(batchMessageReceived(IrcBatchMessage*)));
+    QVERIFY(messageSpy.isValid());
+    QVERIFY(batchMessageSpy.isValid());
+
+    QVERIFY(waitForWritten(":irc.host BATCH +yXNAbvnRHTRBv netsplit irc.hub other.host"));
+    QVERIFY(waitForWritten("@batch=yXNAbvnRHTRBv :aji!a@a QUIT :irc.hub other.host"));
+    QVERIFY(waitForWritten("@batch=yXNAbvnRHTRBv :nenolod!a@a QUIT :irc.hub other.host"));
+    QVERIFY(waitForWritten(":nick!user@host PRIVMSG #channel :This is not in batch, so processed immediately"));
+    QVERIFY(waitForWritten("@batch=yXNAbvnRHTRBv :jilles!a@a QUIT :irc.hub other.host"));
+    QVERIFY(waitForWritten(":irc.host BATCH -yXNAbvnRHTRBv"));
+
+    QCOMPARE(messageSpy.count(), 2); // BATCH + NICK
+    QCOMPARE(batchMessageSpy.count(), 1);
+
+    IrcBatchMessage* batch = batchMessageSpy.last().last().value<IrcBatchMessage*>();
+    QVERIFY(batch);
+    QVERIFY(batch->isValid());
+    QCOMPARE(batch->tag(), QString("yXNAbvnRHTRBv"));
+    QCOMPARE(batch->batch(), QString("netsplit"));
+    QCOMPARE(batch->messages().count(), 3);
+
+    IrcQuitMessage* q1 = qobject_cast<IrcQuitMessage*>(batch->messages().at(0));
+    QVERIFY(q1);
+    QCOMPARE(q1->nick(), QString("aji"));
+    QCOMPARE(q1->reason(), QString("irc.hub other.host"));
+
+    IrcQuitMessage* q2 = qobject_cast<IrcQuitMessage*>(batch->messages().at(1));
+    QVERIFY(q2);
+    QCOMPARE(q2->nick(), QString("nenolod"));
+    QCOMPARE(q2->reason(), QString("irc.hub other.host"));
+
+    IrcQuitMessage* q3 = qobject_cast<IrcQuitMessage*>(batch->messages().at(2));
+    QVERIFY(q3);
+    QCOMPARE(q3->nick(), QString("jilles"));
+    QCOMPARE(q3->reason(), QString("irc.hub other.host"));
+}
+
+void tst_IrcConnection::testServerTime()
+{
+    connection->open();
+    QVERIFY(waitForOpened());
+
+    QSignalSpy messageSpy(connection, SIGNAL(numericMessageReceived(IrcNumericMessage*)));
+    QVERIFY(messageSpy.isValid());
+
+    QVERIFY(waitForWritten("@time=2011-10-19T16:40:51.620Z :my.irc.ser.ver 001 communi :Welcome..."));
+
+    QCOMPARE(messageSpy.count(), 1);
+    IrcNumericMessage* message = messageSpy.last().last().value<IrcNumericMessage*>();
+    QVERIFY(message);
+    QVERIFY(message->isValid());
+    QCOMPARE(message->timeStamp(), QDateTime(QDate(2011, 10, 19), QTime(16, 40, 51, 620), Qt::UTC));
 }
 
 void tst_IrcConnection::testSendCommand()
@@ -1609,6 +1831,11 @@ void tst_IrcConnection::testCtcp()
 {
     FriendlyConnection* friendly = static_cast<FriendlyConnection*>(connection.data());
 
+    QVariantMap replies;
+    replies.insert("FOO", "bar");
+    connection->setCtcpReplies(replies);
+    QCOMPARE(connection->ctcpReplies(), replies);
+
     // PING
     IrcMessage* msg = IrcMessage::fromData(":nick!user@host PRIVMSG communi :\1PING timestamp\1", connection);
     QScopedPointer<IrcPrivateMessage> pingRequest(qobject_cast<IrcPrivateMessage*>(msg));
@@ -1667,6 +1894,32 @@ void tst_IrcConnection::testCtcp()
     QVERIFY(infoReply->toString().contains("VERSION"));
     QVERIFY(infoReply->toString().contains("SOURCE"));
     QVERIFY(infoReply->toString().endsWith("\1"));
+
+    // FOO
+    msg = IrcMessage::fromData(":nick!user@host PRIVMSG communi :\1FOO\1", connection);
+    QScopedPointer<IrcPrivateMessage> fooRequest(qobject_cast<IrcPrivateMessage*>(msg));
+    QVERIFY(fooRequest.data());
+
+    QScopedPointer<IrcCommand> fooReply(friendly->createCtcpReply(fooRequest.data()));
+    QVERIFY(fooReply.data());
+    QCOMPARE(fooReply->type(), IrcCommand::CtcpReply);
+    QCOMPARE(fooReply->toString(), QString("NOTICE nick :\1FOO bar\1"));
+
+    // override
+    replies.insert("VERSION", "none");
+    connection->setCtcpReplies(replies);
+    QCOMPARE(connection->ctcpReplies(), replies);
+
+    msg = IrcMessage::fromData(":nick!user@host PRIVMSG communi :\1VERSION\1", connection);
+    QScopedPointer<IrcPrivateMessage> overrideRequest(qobject_cast<IrcPrivateMessage*>(msg));
+    QVERIFY(overrideRequest.data());
+
+    QScopedPointer<IrcCommand> overrideReply(friendly->createCtcpReply(overrideRequest.data()));
+    QVERIFY(overrideReply.data());
+    QCOMPARE(overrideReply->type(), IrcCommand::CtcpReply);
+    QCOMPARE(overrideReply->toString(), QString("NOTICE nick :\1VERSION none\1"));
+
+    connection->setCtcpReplies(QVariantMap());
 
     // QML compatibility
     FakeQmlConnection qmlConnection;
@@ -1736,6 +1989,122 @@ void tst_IrcConnection::testCtcp()
     QVERIFY(protocol->written.contains("VERSION"));
     QVERIFY(protocol->written.contains("SOURCE"));
     QVERIFY(protocol->written.endsWith("\1"));
+}
+
+void tst_IrcConnection::testClone()
+{
+    QVariantMap ud;
+    ud.insert("foo", "bar");
+
+    IrcConnection c1;
+    c1.setHost("host");
+    c1.setPort(123);
+    c1.setServers(QStringList() << "s1" << "s2" << "s3");
+    c1.setUserName("user");
+    c1.setNickName("nick");
+    c1.setRealName("real");
+    c1.setPassword("pass");
+    c1.setNickNames(QStringList() << "n1" << "n2" << "n3");
+    c1.setDisplayName("display");
+    c1.setUserData(ud);
+    c1.setEncoding("UTF-8");
+    c1.setEnabled(false);
+    c1.setReconnectDelay(10);
+    c1.setSecure(true);
+    c1.setSaslMechanism("PLAIN");
+
+    IrcConnection* c2 = c1.clone(&c1);
+    QCOMPARE(c2->parent(), &c1);
+
+    QCOMPARE(c2->host(), QString("host"));
+    QCOMPARE(c2->port(), 123);
+    QCOMPARE(c2->servers(), QStringList() << "s1" << "s2" << "s3");
+    QCOMPARE(c2->userName(), QString("user"));
+    QCOMPARE(c2->nickName(), QString("nick"));
+    QCOMPARE(c2->realName(), QString("real"));
+    QCOMPARE(c2->password(), QString("pass"));
+    QCOMPARE(c2->nickNames(), QStringList() << "n1" << "n2" << "n3");
+    QCOMPARE(c2->displayName(), QString("display"));
+    QCOMPARE(c2->userData(), ud);
+    QCOMPARE(c2->encoding(), QByteArray("UTF-8"));
+    QVERIFY(!c2->isEnabled());
+    QCOMPARE(c2->reconnectDelay(), 10);
+    QVERIFY(c2->isSecure());
+    QCOMPARE(c2->saslMechanism(), QString("PLAIN"));
+}
+
+void tst_IrcConnection::testSaveRestore()
+{
+    QVariantMap ud;
+    ud.insert("foo", "bar");
+
+    IrcConnection c1;
+    c1.setHost("host");
+    c1.setPort(123);
+    c1.setServers(QStringList() << "s1" << "s2" << "s3");
+    c1.setUserName("user");
+    c1.setNickName("nick");
+    c1.setRealName("real");
+    c1.setPassword("pass");
+    c1.setNickNames(QStringList() << "n1" << "n2" << "n3");
+    c1.setDisplayName("display");
+    c1.setUserData(ud);
+    c1.setEncoding("UTF-8");
+    c1.setEnabled(false);
+    c1.setReconnectDelay(10);
+    c1.setSecure(true);
+    c1.setSaslMechanism("PLAIN");
+
+    IrcConnection c2;
+    c2.restoreState(c1.saveState());
+
+    QCOMPARE(c2.host(), QString("host"));
+    QCOMPARE(c2.port(), 123);
+    QCOMPARE(c2.servers(), QStringList() << "s1" << "s2" << "s3");
+    QCOMPARE(c2.userName(), QString("user"));
+    QEXPECT_FAIL("", "TODO", Continue);
+    QCOMPARE(c2.nickName(), QString("nick"));
+    QCOMPARE(c2.realName(), QString("real"));
+    QCOMPARE(c2.password(), QString("pass"));
+    QCOMPARE(c2.nickNames(), QStringList() << "n1" << "n2" << "n3");
+    QCOMPARE(c2.displayName(), QString("display"));
+    QCOMPARE(c2.userData(), ud);
+    QCOMPARE(c2.encoding(), QByteArray("UTF-8"));
+    QVERIFY(!c2.isEnabled());
+    QCOMPARE(c2.reconnectDelay(), 10);
+    QVERIFY(c2.isSecure());
+    QCOMPARE(c2.saslMechanism(), QString("PLAIN"));
+}
+
+void tst_IrcConnection::testSignals()
+{
+    connection->open();
+    QVERIFY(waitForOpened());
+
+    QSignalSpy channelKeyRequiredSpy(connection, SIGNAL(channelKeyRequired(QString,QString*)));
+    QVERIFY(channelKeyRequiredSpy.isValid());
+
+    QVERIFY(waitForWritten(":hobana.freenode.net 475 jpnurmi #communi :Cannot join channel (+k) - bad key"));
+    QCOMPARE(channelKeyRequiredSpy.count(), 1);
+    QCOMPARE(channelKeyRequiredSpy.last().first().toString(), QString("#communi"));
+
+    QSignalSpy nickNameRequiredSpy(connection, SIGNAL(nickNameRequired(QString,QString*)));
+    QVERIFY(nickNameRequiredSpy.isValid());
+
+    QVERIFY(waitForWritten(":sinisalo.freenode.net 433 * jpnurmi :Nickname is already in use."));
+    QCOMPARE(nickNameRequiredSpy.count(), 1);
+    QCOMPARE(nickNameRequiredSpy.last().first().toString(), QString("jpnurmi"));
+}
+
+void tst_IrcConnection::testServers()
+{
+    QVERIFY(IrcConnection::isValidServer("irc.freenode.net"));
+    QVERIFY(IrcConnection::isValidServer("irc.freenode.net 6667"));
+    QVERIFY(IrcConnection::isValidServer("irc.freenode.net +6697"));
+
+    QVERIFY(!IrcConnection::isValidServer(""));
+    QVERIFY(!IrcConnection::isValidServer("irc.freenode.net foobar"));
+    QVERIFY(!IrcConnection::isValidServer("irc.freenode.net 6667 foobar"));
 }
 
 QTEST_MAIN(tst_IrcConnection)
