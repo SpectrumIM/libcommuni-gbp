@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2015 The Communi Project
+ * Copyright (C) 2008-2016 The Communi Project
  *
  * This test is free, and not covered by the BSD license. There is no
  * restriction applied to their modification, redistribution, using and so on.
@@ -31,6 +31,8 @@ private slots:
     void testCapabilities_data();
     void testCapabilities();
 
+    void testCapNotify();
+
     void testDebug();
 };
 
@@ -40,9 +42,9 @@ void tst_IrcNetwork::testDefaults()
     IrcNetwork* network = connection.network();
     QVERIFY(!network->isInitialized());
     QVERIFY(network->name().isNull());
-    QVERIFY(network->modes().isEmpty());
-    QVERIFY(network->prefixes().isEmpty());
-    QVERIFY(network->channelTypes().isEmpty());
+    QCOMPARE(network->modes(), QStringList() << "o" << "v");
+    QCOMPARE(network->prefixes(), QStringList() << "@" << "+");
+    QCOMPARE(network->channelTypes(), QStringList() << "#");
     QVERIFY(network->availableCapabilities().isEmpty());
     QVERIFY(network->requestedCapabilities().isEmpty());
     QVERIFY(network->activeCapabilities().isEmpty());
@@ -135,6 +137,10 @@ void tst_IrcNetwork::testInfo()
         QVERIFY(network->numericLimit(IrcNetwork::ModeCount) != -1);
     else
         QCOMPARE(network->numericLimit(IrcNetwork::ModeCount), -1);
+    if (welcome.contains("MONITOR="))
+        QVERIFY(network->numericLimit(IrcNetwork::MonitorCount) != -1);
+    else
+        QCOMPARE(network->numericLimit(IrcNetwork::MonitorCount), -1);
 
     QCOMPARE(network->numericLimit(IrcNetwork::MessageLength), 512); // hard-coded :/
 
@@ -170,14 +176,22 @@ void tst_IrcNetwork::testInfo()
 
     QCOMPARE(initSpy.count(), 1);
     QCOMPARE(nameSpy.count(), 1);
-    QCOMPARE(modesSpy.count(), 1);
-    QCOMPARE(prefixesSpy.count(), 1);
-    QCOMPARE(channelTypesSpy.count(), 1);
-
     QCOMPARE(nameSpy.first().first().toString(), name);
-    QCOMPARE(modesSpy.first().first().toStringList(), modes.split("", QString::SkipEmptyParts));
-    QCOMPARE(prefixesSpy.first().first().toStringList(), prefixes.split("", QString::SkipEmptyParts));
-    QCOMPARE(channelTypesSpy.first().first().toStringList(), channelTypes.split("", QString::SkipEmptyParts));
+
+    bool defaultModes = network->modes() == IrcConnection().network()->modes();
+    QCOMPARE(modesSpy.count(), defaultModes ? 0 : 1);
+    if (!defaultModes)
+        QCOMPARE(modesSpy.first().first().toStringList(), modes.split("", QString::SkipEmptyParts));
+
+    bool defaultPrefixes = network->prefixes() == IrcConnection().network()->prefixes();
+    QCOMPARE(prefixesSpy.count(), defaultPrefixes ? 0 : 1);
+    if (!defaultPrefixes)
+        QCOMPARE(prefixesSpy.first().first().toStringList(), prefixes.split("", QString::SkipEmptyParts));
+
+    bool defaultTypes = network->channelTypes() == IrcConnection().network()->channelTypes();
+    QCOMPARE(channelTypesSpy.count(), defaultTypes ? 0 : 1);
+    if (!defaultTypes)
+        QCOMPARE(channelTypesSpy.first().first().toStringList(), channelTypes.split("", QString::SkipEmptyParts));
 }
 
 void tst_IrcNetwork::testCapabilities_data()
@@ -353,6 +367,38 @@ void tst_IrcNetwork::testCapabilities()
     if (!activeCaps.isEmpty())
         ++activeCount;
     QCOMPARE(activeSpy.count(), activeCount);
+}
+
+void tst_IrcNetwork::testCapNotify()
+{
+    connection->open();
+    QVERIFY(waitForOpened());
+
+    IrcNetwork* network = connection->network();
+    network->setRequestedCapabilities(QStringList() << "cap-notify" << "away-notify");
+
+    QVERIFY(waitForWritten(":irc.ser.ver CAP jpnurmi LS :cap-notify"));
+
+    QSignalSpy availableSpy(network, SIGNAL(availableCapabilitiesChanged(QStringList)));
+    QSignalSpy activeSpy(network, SIGNAL(activeCapabilitiesChanged(QStringList)));
+
+    QVERIFY(availableSpy.isValid());
+    QVERIFY(activeSpy.isValid());
+
+    QVERIFY(waitForWritten(":irc.ser.ver CAP jpnurmi NEW :away-notify foo-bar"));
+    QCOMPARE(availableSpy.count(), 1);
+    QVERIFY(network->hasCapability("away-notify"));
+    QVERIFY(network->hasCapability("foo-bar"));
+    QVERIFY(waitForWritten(":irc.ser.ver CAP jpnurmi ACK :away-notify"));
+    QCOMPARE(activeSpy.count(), 1);
+    QVERIFY(network->isCapable("away-notify"));
+
+    QVERIFY(waitForWritten(":irc.ser.ver CAP jpnurmi DEL :away-notify"));
+    QCOMPARE(availableSpy.count(), 2);
+    QCOMPARE(activeSpy.count(), 2);
+    QVERIFY(!network->isCapable("away-notify"));
+    QVERIFY(!network->hasCapability("away-notify"));
+    QVERIFY(network->hasCapability("foo-bar"));
 }
 
 void tst_IrcNetwork::testDebug()

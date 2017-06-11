@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2008-2015 The Communi Project
+  Copyright (C) 2008-2016 The Communi Project
 
   You may use this file under the terms of BSD license as follows:
 
@@ -81,8 +81,10 @@ IRC_BEGIN_NAMESPACE
  */
 
 /*!
-    \var IrcMessage::Unknown
-    \brief An unknown message (IrcMessage).
+    \since 3.5
+    \var IrcMessage::Batch
+    \brief A batch message (IrcBatchMessage).
+    \sa \ref ircv3
  */
 
 /*!
@@ -178,6 +180,11 @@ IRC_BEGIN_NAMESPACE
  */
 
 /*!
+    \var IrcMessage::Unknown
+    \brief An unknown message (IrcMessage).
+ */
+
+/*!
     \since 3.3
     \var IrcMessage::Whois
     \brief A whois reply message (IrcWhoisMessage).
@@ -240,6 +247,7 @@ static const QMetaObject* irc_command_meta_object(const QString& command)
     if (metaObjects.isEmpty()) {
         metaObjects.insert("ACCOUNT", &IrcAccountMessage::staticMetaObject);
         metaObjects.insert("AWAY", &IrcAwayMessage::staticMetaObject);
+        metaObjects.insert("BATCH", &IrcBatchMessage::staticMetaObject);
         metaObjects.insert("CAP", &IrcCapabilityMessage::staticMetaObject);
         metaObjects.insert("ERROR", &IrcErrorMessage::staticMetaObject);
         metaObjects.insert("CHGHOST", &IrcHostChangeMessage::staticMetaObject);
@@ -339,11 +347,31 @@ bool IrcMessage::isOwn() const
 }
 
 /*!
+    \since 3.5
+    \property bool IrcMessage::implicit
+
+    This property holds whether the message is an implicit "reply"
+    after joining a channel.
+
+    This property is provided for convenience. It is equivalent
+    of testing for the IrcMessage::Implicit flag.
+
+    \par Access function:
+    \li bool <b>isImplicit</b>() const
+ */
+bool IrcMessage::isImplicit() const
+{
+    return flags() & Implicit;
+}
+
+/*!
     This property holds the message flags.
 
     \par Access function:
     \li \ref IrcMessage::Flag "IrcMessage::Flags" <b>flags</b>() const
     \li void <b>setFlags</b>(\ref IrcMessage::Flag "IrcMessage::Flags" flags) (\b Since 3.2)
+
+    \sa testFlag(), setFlag()
  */
 IrcMessage::Flags IrcMessage::flags() const
 {
@@ -360,6 +388,33 @@ void IrcMessage::setFlags(IrcMessage::Flags flags)
 {
     Q_D(IrcMessage);
     d->flags = flags;
+}
+
+/*!
+    \since 3.5
+
+    Returns \c true if the \a flag is on; otherwise \c false.
+
+    \sa IrcMessage::flags
+ */
+bool IrcMessage::testFlag(Flag flag) const
+{
+    return flags().testFlag(flag);
+}
+
+/*!
+    \since 3.5
+
+    Sets whether the \a flag is \a on.
+
+    \sa IrcMessage::flags
+ */
+void IrcMessage::setFlag(Flag flag, bool on)
+{
+    if (on)
+        setFlags(flags() | flag);
+    else
+        setFlags(flags() & ~flag);
 }
 
 /*!
@@ -495,6 +550,32 @@ void IrcMessage::setParameters(const QStringList& parameters)
 }
 
 /*!
+    \since 3.5
+
+    Returns the parameter at the specified \a index.
+ */
+QString IrcMessage::parameter(int index) const
+{
+    Q_D(const IrcMessage);
+    return d->param(index);
+}
+
+/*!
+    \since 3.5
+
+    Sets the \a parameter at the specified \a index.
+ */
+void IrcMessage::setParameter(int index, const QString& parameter)
+{
+    Q_D(IrcMessage);
+    QStringList params = d->params();
+    while (index >= params.count())
+        params.append(QString());
+    params[index] = parameter;
+    d->setParams(params);
+}
+
+/*!
     This property holds the message time stamp.
 
     \note When the \c server-time capability is enabled, the time
@@ -576,6 +657,34 @@ void IrcMessage::setTags(const QVariantMap& tags)
 }
 
 /*!
+    \since 3.5
+
+    Returns the value of the specified tag.
+
+    \sa \ref ircv3
+ */
+QVariant IrcMessage::tag(const QString& name) const
+{
+    Q_D(const IrcMessage);
+    return d->tags().value(name);
+}
+
+/*!
+    \since 3.5
+
+    Sets the value of the specified tag.
+
+    \sa \ref ircv3
+ */
+void IrcMessage::setTag(const QString& name, const QVariant& value)
+{
+    Q_D(IrcMessage);
+    QVariantMap tags = d->tags();
+    tags.insert(name, value);
+    d->setTags(tags);
+}
+
+/*!
     Creates a new message from \a data and \a connection.
  */
 IrcMessage* IrcMessage::fromData(const QByteArray& data, IrcConnection* connection)
@@ -587,6 +696,12 @@ IrcMessage* IrcMessage::fromData(const QByteArray& data, IrcConnection* connecti
         message = qobject_cast<IrcMessage*>(metaObject->newInstance(Q_ARG(IrcConnection*, connection)));
         Q_ASSERT(message);
         message->d_ptr->data = md;
+        QByteArray tag = md.tags.value("time");
+        if (!tag.isEmpty()) {
+            QDateTime ts = QDateTime::fromString(QString::fromUtf8(tag), Qt::ISODate);
+            if (ts.isValid())
+                message->d_ptr->timeStamp = ts.toTimeSpec(Qt::LocalTime);
+        }
     }
     return message;
 }
@@ -606,6 +721,35 @@ IrcMessage* IrcMessage::fromParameters(const QString& prefix, const QString& com
         message->setParameters(parameters);
     }
     return message;
+}
+
+/*!
+    \since 3.5
+
+    Clones the message.
+ */
+IrcMessage* IrcMessage::clone(QObject* parent) const
+{
+    Q_D(const IrcMessage);
+    IrcMessage* msg = qobject_cast<IrcMessage*>(metaObject()->newInstance(Q_ARG(IrcConnection*, d->connection)));
+    if (msg) {
+        msg->setParent(parent);
+        IrcMessagePrivate* p = IrcMessagePrivate::get(msg);
+        p->timeStamp = d->timeStamp;
+        p->encoding = d->encoding;
+        p->flags = d->flags;
+        p->data = d->data;
+        foreach (IrcMessage* bm, d->batch)
+            p->batch += bm->clone(msg);
+        p->m_nick = d->m_nick;
+        p->m_ident = d->m_ident;
+        p->m_host = d->m_host;
+        p->m_prefix = d->m_prefix;
+        p->m_command = d->m_command;
+        p->m_params = d->m_params;
+        p->m_tags = d->m_tags;
+    }
+    return msg;
 }
 
 /*!
@@ -739,6 +883,64 @@ bool IrcAccountMessage::isValid() const
 {
     Q_D(const IrcMessage);
     return IrcMessage::isValid() && !d->param(0).isEmpty();
+}
+
+/*!
+    \since 3.5
+    \class IrcBatchMessage ircmessage.h <IrcMessage>
+    \ingroup message
+    \brief Represents a batch message.
+    \sa \ref ircv3
+ */
+
+/*!
+    Constructs a new IrcBatchMessage with \a connection.
+ */
+IrcBatchMessage::IrcBatchMessage(IrcConnection* connection) : IrcMessage(connection)
+{
+    Q_D(IrcMessage);
+    d->type = Batch;
+}
+
+/*!
+    This property holds the batch tag.
+
+    \par Access function:
+    \li QString <b>tag</b>() const
+ */
+QString IrcBatchMessage::tag() const
+{
+    Q_D(const IrcMessage);
+    return d->param(0).mid(1);
+}
+
+/*!
+    This property holds the batch type.
+
+    \par Access function:
+    \li QString <b>type</b>() const
+ */
+QString IrcBatchMessage::batch() const
+{
+    Q_D(const IrcMessage);
+    return d->param(1);
+}
+
+/*!
+    This property holds the list of batched messages.
+
+    \par Access function:
+    \li QList<IrcMessage*> <b>messages</b>() const
+ */
+QList<IrcMessage*> IrcBatchMessage::messages() const
+{
+    Q_D(const IrcMessage);
+    return d->batch;
+}
+
+bool IrcBatchMessage::isValid() const
+{
+    return IrcMessage::isValid() && !batch().isEmpty();
 }
 
 /*!
@@ -1177,13 +1379,17 @@ bool IrcModeMessage::isReply() const
  */
 IrcModeMessage::Kind IrcModeMessage::kind() const
 {
-    Q_D(const IrcMessage);
-    const IrcNetwork* network = d->connection->network();
-    const QStringList channelModes = network->channelModes(IrcNetwork::AllTypes);
     const QString m = mode().remove(QLatin1Char('+')).remove(QLatin1Char('-'));
-    for (int i = 0; i < m.length(); ++i) {
-        if (!channelModes.contains(m.at(i)))
-            return User;
+    if (!m.isEmpty()) {
+        QStringList channelModes;
+        if (const IrcNetwork* net = network())
+            channelModes = net->channelModes(IrcNetwork::AllTypes);
+        if (!channelModes.isEmpty()) {
+            for (int i = 0; i < m.length(); ++i) {
+                if (!channelModes.contains(m.at(i)))
+                    return User;
+            }
+        }
     }
     return Channel;
 }
@@ -1577,7 +1783,8 @@ IrcPongMessage::IrcPongMessage(IrcConnection* connection) : IrcMessage(connectio
 QString IrcPongMessage::argument() const
 {
     Q_D(const IrcMessage);
-    return d->param(1);
+    QStringList params = d->params();
+    return params.value(params.count() - 1);
 }
 
 bool IrcPongMessage::isValid() const
@@ -1926,10 +2133,24 @@ QStringList IrcWhoisMessage::channels() const
     return d->params().value(8).split(QLatin1Char(' '), QString::SkipEmptyParts);
 }
 
+/*!
+    \since 3.5
+
+    This property holds the away reason of the user.
+
+    \par Access function:
+    \li QString <b>awayReason</b>() const
+ */
+QString IrcWhoisMessage::awayReason() const
+{
+    Q_D(const IrcMessage);
+    return d->param(9);
+}
+
 bool IrcWhoisMessage::isValid() const
 {
     Q_D(const IrcMessage);
-    return IrcMessage::isValid() && d->params().count() == 9;
+    return IrcMessage::isValid() && d->params().count() == 10;
 }
 
 /*!
@@ -2112,6 +2333,10 @@ QDebug operator<<(QDebug debug, IrcMessage::Flags flags)
         lst << "None";
     if (flags & IrcMessage::Own)
         lst << "Own";
+    if (flags & IrcMessage::Playback)
+        lst << "Playback";
+    if (flags & IrcMessage::Implicit)
+        lst << "Implicit";
     debug.nospace() << '(' << qPrintable(lst.join("|")) << ')';
     return debug;
 }

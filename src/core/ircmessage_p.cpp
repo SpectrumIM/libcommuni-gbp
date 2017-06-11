@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2008-2015 The Communi Project
+  Copyright (C) 2008-2016 The Communi Project
 
   You may use this file under the terms of BSD license as follows:
 
@@ -154,7 +154,7 @@ QByteArray IrcMessagePrivate::content() const
         // format <params>
         foreach (const QString& param, params()) {
             data += ' ';
-            if (param.contains(QLatin1Char(' ')))
+            if (param.isEmpty() || param.startsWith(QLatin1Char(':')) || param.contains(QLatin1Char(' ')))
                 data += ':';
             data += param.toUtf8();
         }

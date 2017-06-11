@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2008-2015 The Communi Project
+  Copyright (C) 2008-2016 The Communi Project
 
   You may use this file under the terms of BSD license as follows:
 
@@ -39,7 +39,7 @@
 IRC_BEGIN_NAMESPACE
 
 namespace IrcUtil {
-    void registerMetaTypes();
+    IRC_UTIL_EXPORT void registerMetaTypes();
 }
 
 IRC_END_NAMESPACE

@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2008-2015 The Communi Project
+  Copyright (C) 2008-2016 The Communi Project
 
   You may use this file under the terms of BSD license as follows:
 
@@ -31,6 +31,7 @@
 
 #include <Irc>
 #include <IrcGlobal>
+#include <QtCore/qmetatype.h>
 #include <QtCore/qstringlist.h>
 #include <QtCore/qabstractitemmodel.h>
 
@@ -118,5 +119,7 @@ private:
 };
 
 IRC_END_NAMESPACE
+
+Q_DECLARE_METATYPE(IRC_PREPEND_NAMESPACE(IrcUserModel*))
 
 #endif // IRCUSERMODEL_H

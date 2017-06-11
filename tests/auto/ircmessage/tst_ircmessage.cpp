@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2015 The Communi Project
+ * Copyright (C) 2008-2016 The Communi Project
  *
  * This test is free, and not covered by the BSD license. There is no
  * restriction applied to their modification, redistribution, using and so on.
@@ -26,6 +26,8 @@ class tst_IrcMessage : public QObject
 private slots:
     void testDefaults();
 
+    void testToData();
+
     void testPrefix_data();
     void testPrefix();
 
@@ -40,8 +42,11 @@ private slots:
     void testDecoder_data();
     void testDecoder();
 
-    void testTags_data();
     void testTags();
+    void testServerTime();
+
+    void testAccount_data();
+    void testAccount();
 
     void testAccountMessage_data();
     void testAccountMessage();
@@ -51,6 +56,8 @@ private slots:
     void testCapabilityMessage();
     void testErrorMessage_data();
     void testErrorMessage();
+    void testHostChangeMessage_data();
+    void testHostChangeMessage();
     void testInviteMessage_data();
     void testInviteMessage();
     void testJoinMessage_data();
@@ -80,6 +87,9 @@ private slots:
     void testWhoReplyMessage_data();
     void testWhoReplyMessage();
 
+    void testClone();
+    void testNullConnection();
+
     void testDebug();
 };
 
@@ -98,6 +108,28 @@ void tst_IrcMessage::testDefaults()
     QVERIFY(msg.command().isNull());
     QVERIFY(msg.parameters().isEmpty());
     QVERIFY(msg.toData().isEmpty());
+}
+
+void tst_IrcMessage::testToData()
+{
+    IrcConnection connection;
+    IrcMessage* msg = IrcMessage::fromData(":nick!ident@host PRIVMSG user :hello there", &connection);
+    QCOMPARE(msg->toData(), QByteArray(":nick!ident@host PRIVMSG user :hello there"));
+
+    msg = IrcMessage::fromData(":nick!ident@host PRIVMSG user ::)", &connection);
+    QCOMPARE(msg->toData(), QByteArray(":nick!ident@host PRIVMSG user ::)"));
+
+    msg = IrcMessage::fromData(":nick!ident@host TOPIC #channel :", &connection);
+    QCOMPARE(msg->toData(), QByteArray(":nick!ident@host TOPIC #channel :"));
+
+    msg = IrcMessage::fromParameters("nick!ident@host", "PRIVMSG", QStringList() << "user" << "hello there", &connection);
+    QCOMPARE(msg->toData(), QByteArray(":nick!ident@host PRIVMSG user :hello there"));
+
+    msg = IrcMessage::fromParameters("nick!ident@host", "PRIVMSG", QStringList() << "user" << ":)", &connection);
+    QCOMPARE(msg->toData(), QByteArray(":nick!ident@host PRIVMSG user ::)"));
+
+    msg = IrcMessage::fromParameters("nick!ident@host", "TOPIC", QStringList() << "#channel" << "", &connection);
+    QCOMPARE(msg->toData(), QByteArray(":nick!ident@host TOPIC #channel :"));
 }
 
 void tst_IrcMessage::testPrefix_data()
@@ -157,12 +189,38 @@ void tst_IrcMessage::testParameters()
     QCOMPARE(message->prefix(), prefix);
     QCOMPARE(message->command(), command);
     QCOMPARE(message->parameters(), params);
+
+    for (int i = 0; i < params.count(); ++i)
+        QCOMPARE(message->parameter(i), params.at(i));
+
+    message->setParameter(5, "foo");
+    QCOMPARE(message->parameter(4), QString());
+    QCOMPARE(message->parameter(5), QString("foo"));
 }
 
 void tst_IrcMessage::testFlags()
 {
     IrcMessage msg(0);
     msg.setPrefix("a!b@c");
+    QCOMPARE(msg.flags(), IrcMessage::None);
+
+    QVERIFY(!msg.testFlag(IrcMessage::Playback));
+    msg.setFlag(IrcMessage::Playback);
+    QVERIFY(msg.testFlag(IrcMessage::Playback));
+    QCOMPARE(msg.flags(), IrcMessage::Playback);
+
+    QVERIFY(!msg.testFlag(IrcMessage::Implicit));
+    msg.setFlag(IrcMessage::Implicit);
+    QVERIFY(msg.testFlag(IrcMessage::Implicit));
+    QCOMPARE(msg.flags(), IrcMessage::Playback | IrcMessage::Implicit);
+
+    msg.setFlag(IrcMessage::Playback, false);
+    QVERIFY(!msg.testFlag(IrcMessage::Playback));
+    QCOMPARE(msg.flags(), IrcMessage::Implicit);
+
+    msg.setFlags(IrcMessage::None);
+    QVERIFY(!msg.testFlag(IrcMessage::Implicit));
+    QVERIFY(!msg.testFlag(IrcMessage::Playback));
     QCOMPARE(msg.flags(), IrcMessage::None);
 }
 
@@ -219,40 +277,59 @@ void tst_IrcMessage::testDecoder()
 #endif // Q_OS_LINUX
 }
 
-void tst_IrcMessage::testTags_data()
+void tst_IrcMessage::testTags()
 {
-    QTest::addColumn<QByteArray>("data");
-    QTest::addColumn<QVariantMap>("tags");
-    QTest::addColumn<QString>("prefix");
-    QTest::addColumn<QString>("command");
-    QTest::addColumn<QString>("target");
-    QTest::addColumn<QString>("content");
-
     QVariantMap tags;
     tags.insert("aaa", "bbb");
     tags.insert("ccc", "");
     tags.insert("example.com/ddd", "eee");
 
-    QTest::newRow("example") << QByteArray("@aaa=bbb;ccc;example.com/ddd=eee :nick!ident@host.com PRIVMSG me :Hello")
-                             << tags << "nick!ident@host.com" << "PRIVMSG" << "me" << "Hello";
+    IrcConnection connection;
+    IrcMessage* message = IrcMessage::fromData("@aaa=bbb;ccc;example.com/ddd=eee :nick!ident@host.com PRIVMSG me :Hello", &connection);
+    QCOMPARE(message->tags(), tags);
+
+    tags.insert("ccc", "xyz");
+    message->setTag("ccc", "xyz");
+
+    QCOMPARE(message->tags(), tags);
+    QCOMPARE(message->toData(), QByteArray("@aaa=bbb;ccc=xyz;example.com/ddd=eee :nick!ident@host.com PRIVMSG me Hello"));
+
+    tags.insert("fff", "ggg");
+    message->setTag("fff", "ggg");
+    QCOMPARE(message->tags(), tags);
+    QCOMPARE(message->toData(), QByteArray("@aaa=bbb;ccc=xyz;example.com/ddd=eee;fff=ggg :nick!ident@host.com PRIVMSG me Hello"));
+
+    tags.clear();
+    tags.insert("foo", "bar");
+    message->setTags(tags);
+    QCOMPARE(message->tags(), tags);
+    QCOMPARE(message->toData(), QByteArray("@foo=bar :nick!ident@host.com PRIVMSG me Hello"));
 }
 
-void tst_IrcMessage::testTags()
+void tst_IrcMessage::testServerTime()
+{
+    IrcConnection connection;
+    IrcMessage* message = IrcMessage::fromData("@time=2011-10-19T16:40:51.620Z :Angel!angel@example.org PRIVMSG Wiz :Hello", &connection);
+    QCOMPARE(message->timeStamp(), QDateTime(QDate(2011, 10, 19), QTime(16, 40, 51, 620), Qt::UTC));
+}
+
+void tst_IrcMessage::testAccount_data()
+{
+    QTest::addColumn<QByteArray>("data");
+    QTest::addColumn<QString>("account");
+
+    QTest::newRow("no account") << QByteArray(":nick!ident@host.com PRIVMSG me :Hello") << QString();
+    QTest::newRow("has account") << QByteArray("@account=jpnurmi :nick!ident@host.com PRIVMSG me :Hello") << QString("jpnurmi");
+}
+
+void tst_IrcMessage::testAccount()
 {
     QFETCH(QByteArray, data);
-    QFETCH(QVariantMap, tags);
-    QFETCH(QString, prefix);
-    QFETCH(QString, command);
-    QFETCH(QString, target);
-    QFETCH(QString, content);
+    QFETCH(QString, account);
 
     IrcConnection connection;
     IrcMessage* message = IrcMessage::fromData(data, &connection);
-    QCOMPARE(message->tags(), tags);
-    QCOMPARE(message->prefix(), prefix);
-    QCOMPARE(message->command(), command);
-    QCOMPARE(message->property("target").toString(), target);
-    QCOMPARE(message->property("content").toString(), content);
+    QCOMPARE(message->account(), account);
 }
 
 void tst_IrcMessage::testAccountMessage_data()
@@ -389,6 +466,41 @@ void tst_IrcMessage::testErrorMessage()
     QVERIFY(errorMessage);
     QCOMPARE(errorMessage->isValid(), valid);
     QCOMPARE(errorMessage->error(), error);
+}
+
+void tst_IrcMessage::testHostChangeMessage_data()
+{
+    QTest::addColumn<bool>("valid");
+    QTest::addColumn<QByteArray>("data");
+    QTest::addColumn<QString>("user");
+    QTest::addColumn<QString>("host");
+
+    QTest::newRow("no prefix") << true << QByteArray("CHGHOST newuser newhost") << QString("newuser") << QString("newhost");
+    QTest::newRow("empty prefix") << false << QByteArray(": CHGHOST newuser newhost") << QString("newuser") << QString("newhost");
+    QTest::newRow("no params") << false << QByteArray(":nick!user@host CHGHOST") << QString() << QString();
+    QTest::newRow("all ok") << true << QByteArray(":nick!user@host CHGHOST newuser newhost") << QString("newuser") << QString("newhost");
+}
+
+void tst_IrcMessage::testHostChangeMessage()
+{
+    QFETCH(bool, valid);
+    QFETCH(QByteArray, data);
+    QFETCH(QString, user);
+    QFETCH(QString, host);
+
+    IrcConnection connection;
+    IrcMessage* message = IrcMessage::fromData(data, &connection);
+    QCOMPARE(message->type(), IrcMessage::HostChange);
+    QCOMPARE(message->command(), QString("CHGHOST"));
+    QCOMPARE(message->property("valid").toBool(), valid);
+    QCOMPARE(message->property("user").toString(), user);
+    QCOMPARE(message->property("host").toString(), host);
+
+    IrcHostChangeMessage* chghostMessage = qobject_cast<IrcHostChangeMessage*>(message);
+    QVERIFY(chghostMessage);
+    QCOMPARE(chghostMessage->isValid(), valid);
+    QCOMPARE(chghostMessage->user(), user);
+    QCOMPARE(chghostMessage->host(), host);
 }
 
 void tst_IrcMessage::testInviteMessage_data()
@@ -609,11 +721,13 @@ void tst_IrcMessage::testNumericMessage_data()
     QTest::addColumn<bool>("valid");
     QTest::addColumn<QByteArray>("data");
     QTest::addColumn<int>("code");
+    QTest::addColumn<bool>("composed");
 
-    QTest::newRow("no prefix") << true << QByteArray("123 Kilroy") << 123;
-    QTest::newRow("empty prefix") << false << QByteArray(": 123 Kilroy") << 123;
-    QTest::newRow("no params") << true << QByteArray(":WiZ 456") << 456;
-    QTest::newRow("all ok") << true << QByteArray(":WiZ 789 Kilroy") << 789;
+    QTest::newRow("no prefix") << true << QByteArray("123 Kilroy") << 123 << false;
+    QTest::newRow("empty prefix") << false << QByteArray(": 123 Kilroy") << 123 << false;
+    QTest::newRow("no params") << true << QByteArray(":WiZ 456") << 456 << false;
+    QTest::newRow("all ok") << true << QByteArray(":WiZ 789 Kilroy") << 789 << false;
+    QTest::newRow("composed") << true << QByteArray(":server 352 me someone ...") << 352 << true;
 }
 
 void tst_IrcMessage::testNumericMessage()
@@ -621,6 +735,7 @@ void tst_IrcMessage::testNumericMessage()
     QFETCH(bool, valid);
     QFETCH(QByteArray, data);
     QFETCH(int, code);
+    QFETCH(bool, composed);
 
     IrcConnection connection;
     IrcMessage* message = IrcMessage::fromData(data, &connection);
@@ -628,11 +743,13 @@ void tst_IrcMessage::testNumericMessage()
     QVERIFY(message->command().toInt() > 0);
     QCOMPARE(message->property("valid").toBool(), valid);
     QCOMPARE(message->property("code").toInt(), code);
+    QCOMPARE(message->property("composed").toBool(), composed);
 
     IrcNumericMessage* numericMessage = qobject_cast<IrcNumericMessage*>(message);
     QVERIFY(numericMessage);
     QCOMPARE(numericMessage->isValid(), valid);
     QCOMPARE(numericMessage->code(), code);
+    QCOMPARE(numericMessage->isComposed(), composed);
 }
 
 void tst_IrcMessage::testModeMessage_data()
@@ -991,6 +1108,48 @@ void tst_IrcMessage::testWhoReplyMessage()
     QCOMPARE(message.property("realName").toString(), realName);
 }
 
+void tst_IrcMessage::testClone()
+{
+    IrcConnection connection;
+    IrcMessage* pm = IrcMessage::fromData("@a=b;c=d :nick!ident@host PRIVMSG me :hello", &connection);
+    QVERIFY(pm);
+    IrcMessage* clone = pm->clone(this);
+    QVERIFY(clone);
+    QVERIFY(clone->isValid());
+    QCOMPARE(clone->parent(), this);
+    QCOMPARE(clone->connection(), &connection);
+    QCOMPARE(clone->type(), pm->type());
+    QCOMPARE(clone->flags(), pm->flags());
+    QCOMPARE(clone->tags(), pm->tags());
+    QCOMPARE(clone->prefix(), pm->prefix());
+    QCOMPARE(clone->nick(), pm->nick());
+    QCOMPARE(clone->ident(), pm->ident());
+    QCOMPARE(clone->host(), pm->host());
+    QCOMPARE(clone->command(), pm->command());
+    QCOMPARE(clone->parameters(), pm->parameters());
+    QCOMPARE(clone->timeStamp(), pm->timeStamp());
+    QCOMPARE(clone->account(), pm->account());
+}
+
+void tst_IrcMessage::testNullConnection()
+{
+    IrcMessage* pm = IrcMessage::fromData(":nick!ident@host PRIVMSG me :hello", 0);
+    QCOMPARE(pm->type(), IrcMessage::Private);
+    QCOMPARE(pm->property("target").toString(), QString("me"));
+    QVERIFY(pm->property("statusPrefix").toString().isEmpty());
+    QVERIFY(!pm->property("private").toBool());
+    QCOMPARE(pm->flags(), IrcMessage::None);
+    delete pm;
+
+    IrcMessage* nm = IrcMessage::fromData(":nick!ident@host NOTICE me :hello", 0);
+    QCOMPARE(nm->type(), IrcMessage::Notice);
+    QCOMPARE(nm->property("target").toString(), QString("me"));
+    QVERIFY(nm->property("statusPrefix").toString().isEmpty());
+    QVERIFY(!nm->property("private").toBool());
+    QCOMPARE(nm->flags(), IrcMessage::None);
+    delete nm;
+}
+
 void tst_IrcMessage::testDebug()
 {
     QString str;
@@ -1018,6 +1177,15 @@ void tst_IrcMessage::testDebug()
     message.setCommand("COMMAND");
     dbg << &message;
     QVERIFY(QRegExp("IrcMessage\\(0x[0-9A-Fa-f]+, name=foo, flags=\\(None\\), prefix=nick!ident@host, command=COMMAND\\) ").exactMatch(str));
+    str.clear();
+
+    message.setFlags(IrcMessage::Own | IrcMessage::Playback | IrcMessage::Implicit);
+    dbg << &message;
+    QVERIFY(QRegExp("IrcMessage\\(0x[0-9A-Fa-f]+, name=foo, flags=\\(Own\\|Playback\\|Implicit\\), prefix=nick!ident@host, command=COMMAND\\) ").exactMatch(str));
+    str.clear();
+
+    dbg << IrcMessage::None;
+    QCOMPARE(str.trimmed(), QString::fromLatin1("None"));
     str.clear();
 
     dbg << IrcMessage::Join;

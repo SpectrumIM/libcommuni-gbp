@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2015 The Communi Project
+ * Copyright (C) 2008-2016 The Communi Project
  *
  * This example is free, and not covered by the BSD license. There is no
  * restriction applied to their modification, redistribution, using and so on.
@@ -13,7 +13,7 @@ import Communi 3.0
 QtObject {
     id: bot
 
-    property string channel: "#communi"
+    property string channel: "#botwar"
 
     property Irc irc: Irc { id: irc }
     property IrcCommand command: IrcCommand { id: command }

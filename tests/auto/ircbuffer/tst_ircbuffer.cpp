@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2015 The Communi Project
+ * Copyright (C) 2008-2016 The Communi Project
  *
  * This test is free, and not covered by the BSD license. There is no
  * restriction applied to their modification, redistribution, using and so on.
@@ -8,7 +8,11 @@
  */
 
 #include "ircbuffer.h"
+#include "ircbuffermodel.h"
+#include "ircconnection.h"
+#include "irccommand.h"
 #include "ircmessage.h"
+#include "ircfilter.h"
 #include <QtTest/QtTest>
 #include <QtCore/QRegExp>
 
@@ -23,6 +27,9 @@ private slots:
     void testPersistent();
     void testReceive();
     void testDebug();
+    void testUserData();
+    void testClose();
+    void testSendCommand();
 };
 
 void tst_IrcBuffer::testDefaults()
@@ -39,6 +46,7 @@ void tst_IrcBuffer::testDefaults()
     QVERIFY(!buffer.isActive());
     QVERIFY(!buffer.isSticky());
     QVERIFY(!buffer.isPersistent());
+    QVERIFY(buffer.userData().isEmpty());
 }
 
 void tst_IrcBuffer::testTitleNamePrefix()
@@ -152,6 +160,55 @@ void tst_IrcBuffer::testDebug()
     dbg << &buffer;
     QVERIFY(QRegExp("IrcBuffer\\(0x[0-9A-Fa-f]+, name=obj, title=buf\\) ").exactMatch(str));
     str.clear();
+}
+
+void tst_IrcBuffer::testUserData()
+{
+    QVariantMap ud;
+    ud.insert("foo", "bar");
+
+    IrcBuffer buffer;
+    buffer.setUserData(ud);
+    QCOMPARE(buffer.userData(), ud);
+
+    buffer.setUserData(QVariantMap());
+    QVERIFY(buffer.userData().isEmpty());
+}
+
+void tst_IrcBuffer::testClose()
+{
+    IrcBufferModel model;
+    QPointer<IrcBuffer> buffer = model.add("foo");
+    buffer->close();
+    QVERIFY(!model.contains("foo"));
+    QVERIFY(!buffer);
+}
+
+class TestCommandFilter : public QObject, public IrcCommandFilter
+{
+    Q_OBJECT
+    Q_INTERFACES(IrcCommandFilter)
+
+public:
+    TestCommandFilter(IrcConnection* connection) : lastCommand(0) { connection->installCommandFilter(this); }
+    bool commandFilter(IrcCommand *command) { lastCommand = command; return true; }
+    IrcCommand* lastCommand;
+};
+
+void tst_IrcBuffer::testSendCommand()
+{
+    IrcConnection connection;
+    TestCommandFilter filter(&connection);
+
+    IrcBufferModel model(&connection);
+    QCOMPARE(model.connection(), &connection);
+
+    IrcBuffer* buffer = model.add("foo");
+    QCOMPARE(buffer->connection(), &connection);
+
+    IrcCommand* cmd = IrcCommand::createAway();
+    QVERIFY(!buffer->sendCommand(cmd));
+    QCOMPARE(filter.lastCommand, cmd);
 }
 
 QTEST_MAIN(tst_IrcBuffer)

@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2008-2015 The Communi Project
+  Copyright (C) 2008-2016 The Communi Project
 
   You may use this file under the terms of BSD license as follows:
 
@@ -31,7 +31,7 @@
 #include "ircmessagecomposer_p.h"
 #include "ircnetwork_p.h"
 #include "ircconnection.h"
-#include "ircmessage.h"
+#include "ircmessage_p.h"
 #include "irccommand.h"
 #include "ircdebug_p.h"
 #include "irc.h"
@@ -66,6 +66,9 @@ public:
     void readLines(const QByteArray& delimiter);
     void processLine(const QByteArray& line);
 
+    bool batchMessage(IrcMessage* msg);
+    bool handleBatchMessage(IrcBatchMessage* msg);
+
     void handleNumericMessage(IrcNumericMessage* msg);
     void handlePrivateMessage(IrcPrivateMessage* msg);
     void handleCapabilityMessage(IrcCapabilityMessage* msg);
@@ -76,14 +79,17 @@ public:
     IrcProtocol* q_ptr;
     IrcConnection* connection;
     IrcMessageComposer* composer;
+    QHash<QString, IrcBatchMessage*> batches;
     QHash<QString, QString> info;
     QByteArray buffer;
     int currentNick;
     bool resumed;
     bool authed;
+    bool motd;
 };
 
-IrcProtocolPrivate::IrcProtocolPrivate() : q_ptr(0), connection(0), composer(0), currentNick(-1), resumed(false), authed(false)
+IrcProtocolPrivate::IrcProtocolPrivate() : q_ptr(0), connection(0), composer(0),
+    currentNick(-1), resumed(false), authed(false), motd(false)
 {
 }
 
@@ -115,7 +121,7 @@ void IrcProtocolPrivate::readLines(const QByteArray& delimiter)
 void IrcProtocolPrivate::processLine(const QByteArray& line)
 {
     Q_Q(IrcProtocol);
-    ircDebug(connection) << "<-" << line;
+    ircDebug(connection, IrcDebug::Read) << line;
 
     if (line.startsWith("AUTHENTICATE") && !connection->saslMechanism().isEmpty()) {
         const QList<QByteArray> args = line.split(' ');
@@ -130,16 +136,19 @@ void IrcProtocolPrivate::processLine(const QByteArray& line)
     if (msg) {
         msg->setEncoding(connection->encoding());
 
-        QDateTime timestamp = msg->tags().value("time").toDateTime();
-        if (timestamp.isValid())
-            msg->setTimeStamp(timestamp.toTimeSpec(Qt::LocalTime));
+        if (!msg->tag("batch").isNull() && batchMessage(msg))
+            return;
 
         switch (msg->type()) {
+        case IrcMessage::Batch:
+            if (handleBatchMessage(static_cast<IrcBatchMessage*>(msg)))
+                return;
+            break;
         case IrcMessage::Capability:
             handleCapabilityMessage(static_cast<IrcCapabilityMessage*>(msg));
             break;
         case IrcMessage::Nick:
-            if (msg->flags() & IrcMessage::Own)
+            if (msg->isOwn())
                 q->setNickName(static_cast<IrcNickMessage*>(msg)->newNick());
             break;
         case IrcMessage::Numeric:
@@ -160,11 +169,42 @@ void IrcProtocolPrivate::processLine(const QByteArray& line)
     }
 }
 
+bool IrcProtocolPrivate::batchMessage(IrcMessage* msg)
+{
+    QString tag = msg->tags().value("batch").toString();
+    IrcBatchMessage* batch = batches.value(tag);
+    if (batch) {
+        msg->setParent(batch);
+        IrcMessagePrivate::get(batch)->batch += msg;
+        return true;
+    }
+    return false;
+}
+
+bool IrcProtocolPrivate::handleBatchMessage(IrcBatchMessage* msg)
+{
+    Q_Q(IrcProtocol);
+    QString tag = msg->parameters().value(0);
+    if (tag.startsWith("+")) {
+        batches.insert(msg->tag(), msg);
+        return true;
+    } else if (tag.startsWith("-")) {
+        IrcBatchMessage* batch = batches.take(msg->tag());
+        if (batch) {
+            q->receiveMessage(batch);
+            msg->deleteLater();
+            return true;
+        }
+    }
+    return false;
+}
+
 void IrcProtocolPrivate::handleNumericMessage(IrcNumericMessage* msg)
 {
     Q_Q(IrcProtocol);
     switch (msg->code()) {
     case Irc::RPL_WELCOME:
+        motd = false;
         q->setNickName(msg->parameters().value(0));
         q->setStatus(IrcConnection::Connected);
         break;
@@ -173,10 +213,13 @@ void IrcProtocolPrivate::handleNumericMessage(IrcNumericMessage* msg)
             QStringList keyValue = param.split("=", QString::SkipEmptyParts);
             info.insert(keyValue.value(0), keyValue.value(1));
         }
+        if (motd)
+            q->setInfo(info);
         break;
     }
     case Irc::ERR_NOMOTD:
     case Irc::RPL_MOTDSTART:
+        motd = true;
         q->setInfo(info);
         break;
     case Irc::ERR_NICKNAMEINUSE:
@@ -253,11 +296,12 @@ void IrcProtocolPrivate::handleCapabilityMessage(IrcCapabilityMessage* msg)
             handleCapability(&availableCaps, cap);
         q->setAvailableCapabilities(availableCaps);
 
-        if (!connected) {
+        if (!connected && msg->parameter(2) != "*") {
             QMetaObject::invokeMethod(connection->network(), "requestingCapabilities");
-            QStringList requestedCaps;
+            QSet<QString> requestedCaps;
+            QSet<QString> activeCaps = connection->network()->activeCapabilities().toSet();
             foreach (const QString& cap, connection->network()->requestedCapabilities()) {
-                if (availableCaps.contains(cap))
+                if (availableCaps.contains(cap) && !activeCaps.contains(cap))
                     requestedCaps += cap;
             }
             const QStringList params = msg->parameters();
@@ -266,7 +310,7 @@ void IrcProtocolPrivate::handleCapabilityMessage(IrcCapabilityMessage* msg)
                     requestedCaps += QLatin1String("sasl");
             }
             if (!requestedCaps.isEmpty())
-                connection->sendRaw("CAP REQ :" + requestedCaps.join(" "));
+                connection->sendRaw("CAP REQ :" + QStringList(requestedCaps.toList()).join(" "));
             else
                 QMetaObject::invokeMethod(q, "_irc_resumeHandshake", Qt::QueuedConnection);
         }
@@ -406,6 +450,8 @@ void IrcProtocol::open()
  */
 void IrcProtocol::close()
 {
+    setActiveCapabilities(QSet<QString>());
+    setAvailableCapabilities(QSet<QString>());
 }
 
 /*!
@@ -449,8 +495,7 @@ void IrcProtocol::receiveMessage(IrcMessage* message)
 {
     Q_D(IrcProtocol);
     IrcConnectionPrivate* priv = IrcConnectionPrivate::get(d->connection);
-    priv->receiveMessage(message);
-    if (message->type() == IrcMessage::Numeric)
+    if (priv->receiveMessage(message) && message->type() == IrcMessage::Numeric)
         d->composer->composeMessage(static_cast<IrcNumericMessage*>(message));
 }
 
@@ -493,6 +538,7 @@ void IrcProtocol::setInfo(const QHash<QString, QString>& info)
     if (!info.isEmpty()) {
         IrcConnectionPrivate* priv = IrcConnectionPrivate::get(d->connection);
         priv->setInfo(info);
+        d->info.clear();
     }
 }
 

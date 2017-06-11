@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2008-2015 The Communi Project
+  Copyright (C) 2008-2016 The Communi Project
 
   You may use this file under the terms of BSD license as follows:
 
@@ -66,8 +66,12 @@ namespace IrcCore {
         qRegisterMetaType<IrcMessage*>("IrcMessage*");
         qRegisterMetaType<IrcMessage::Type>("IrcMessage::Type");
 
+        qRegisterMetaType<IrcAccountMessage*>("IrcAccountMessage*");
+        qRegisterMetaType<IrcAwayMessage*>("IrcAwayMessage*");
+        qRegisterMetaType<IrcBatchMessage*>("IrcBatchMessage*");
         qRegisterMetaType<IrcCapabilityMessage*>("IrcCapabilityMessage*");
         qRegisterMetaType<IrcErrorMessage*>("IrcErrorMessage*");
+        qRegisterMetaType<IrcInviteMessage*>("IrcHostChangeMessage*");
         qRegisterMetaType<IrcInviteMessage*>("IrcInviteMessage*");
         qRegisterMetaType<IrcJoinMessage*>("IrcJoinMessage*");
         qRegisterMetaType<IrcKickMessage*>("IrcKickMessage*");
@@ -83,6 +87,8 @@ namespace IrcCore {
         qRegisterMetaType<IrcPrivateMessage*>("IrcPrivateMessage*");
         qRegisterMetaType<IrcQuitMessage*>("IrcQuitMessage*");
         qRegisterMetaType<IrcTopicMessage*>("IrcTopicMessage*");
+        qRegisterMetaType<IrcWhoisMessage*>("IrcWhoisMessage*");
+        qRegisterMetaType<IrcWhowasMessage*>("IrcWhowasMessage*");
         qRegisterMetaType<IrcWhoReplyMessage*>("IrcWhoReplyMessage*");
     }
 }

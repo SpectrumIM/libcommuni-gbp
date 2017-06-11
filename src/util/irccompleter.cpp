@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2008-2015 The Communi Project
+  Copyright (C) 2008-2016 The Communi Project
 
   You may use this file under the terms of BSD license as follows:
 
@@ -251,6 +251,12 @@ QList<IrcCompletion> IrcCompleterPrivate::completeWords(const QString& text, int
         QList<IrcBuffer*> buffers = buffer->model()->buffers();
         buffers.move(buffers.indexOf(buffer), 0); // promote the current buffer
         foreach (IrcBuffer* buffer, buffers) {
+            if (!buffer->isChannel()) {
+                // it would be very confusing to auto-complete the titles of other
+                // open query (or server) buffers, because it makes it look like such
+                // user would be on the channel
+                continue;
+            }
             QString title = buffer->title();
             if (!isChannel && token.index() == 0)
                 title += suffix;

@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2008-2015 The Communi Project
+  Copyright (C) 2008-2016 The Communi Project
 
   You may use this file under the terms of BSD license as follows:
 
@@ -36,19 +36,12 @@
 
 IRC_BEGIN_NAMESPACE
 
-#ifdef IRC_DOXYGEN
-namespace Irc
-{
-    Q_INVOKABLE QString version();
-    Q_INVOKABLE QString codeToString(int code);
-    Q_INVOKABLE QString nickFromPrefix(const QString& prefix);
-    Q_INVOKABLE QString identFromPrefix(const QString& prefix);
-    Q_INVOKABLE QString hostFromPrefix(const QString& prefix);
-    Q_INVOKABLE void registerMetaTypes();
-#else
 class IRC_CORE_EXPORT Irc : public QObject
 {
     Q_OBJECT
+    Q_PROPERTY(bool secureSupported READ isSecureSupported CONSTANT)
+    Q_PROPERTY(QStringList supportedSaslMechanisms READ supportedSaslMechanisms CONSTANT)
+    Q_PROPERTY(QStringList supportedCapabilities READ supportedCapabilities CONSTANT)
     Q_ENUMS(Color DataRole SortMethod Code)
 
 public:
@@ -58,7 +51,10 @@ public:
     Q_INVOKABLE static QString identFromPrefix(const QString& prefix);
     Q_INVOKABLE static QString hostFromPrefix(const QString& prefix);
     Q_INVOKABLE static void registerMetaTypes();
-#endif
+
+    static bool isSecureSupported();
+    static QStringList supportedSaslMechanisms();
+    static QStringList supportedCapabilities();
 
     enum Color {
         White = 0,
@@ -554,6 +550,7 @@ IRC_CORE_EXPORT QDebug operator<<(QDebug debug, Irc::SortMethod method);
 
 IRC_END_NAMESPACE
 
+Q_DECLARE_METATYPE(IRC_PREPEND_NAMESPACE(Irc*))
 Q_DECLARE_METATYPE(IRC_PREPEND_NAMESPACE(Irc::Code))
 Q_DECLARE_METATYPE(IRC_PREPEND_NAMESPACE(Irc::DataRole))
 Q_DECLARE_METATYPE(IRC_PREPEND_NAMESPACE(Irc::Color))

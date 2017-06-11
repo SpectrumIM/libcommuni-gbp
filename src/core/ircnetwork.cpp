@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2008-2015 The Communi Project
+  Copyright (C) 2008-2016 The Communi Project
 
   You may use this file under the terms of BSD license as follows:
 
@@ -72,7 +72,7 @@ IRC_BEGIN_NAMESPACE
     desired capabilities, and provides convenient methods for \ref requestCapability()
     "manual capability requests".
 
-    \sa IrcConnection::network, \ref ircv3
+    \sa IrcConnection::network, Irc::supportedCapabilities, \ref ircv3
  */
 
 /*!
@@ -182,7 +182,8 @@ IRC_BEGIN_NAMESPACE
  */
 
 #ifndef IRC_DOXYGEN
-IrcNetworkPrivate::IrcNetworkPrivate() : q_ptr(0), initialized(false)
+IrcNetworkPrivate::IrcNetworkPrivate() : q_ptr(0), initialized(false),
+    modes(QStringList() << "o" << "v"), prefixes(QStringList() << "@" << "+"), channelTypes("#")
 {
 }
 

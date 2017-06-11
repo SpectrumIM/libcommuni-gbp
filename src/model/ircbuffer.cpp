@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2008-2015 The Communi Project
+  Copyright (C) 2008-2016 The Communi Project
 
   You may use this file under the terms of BSD license as follows:
 
@@ -149,7 +149,7 @@ bool IrcBufferPrivate::isMonitorable() const
     Q_Q(const IrcBuffer);
     IrcNetwork* n = q->network();
     IrcConnection* c = q->connection();
-    if (!sticky && !name.startsWith(QLatin1String("*")) && !q->isChannel() && c && c->isConnected() && n && n->numericLimit(IrcNetwork::MonitorCount) >= 0)
+    if (!sticky && !name.startsWith(QLatin1String("*")) && c && c->isConnected() && n && n->numericLimit(IrcNetwork::MonitorCount) >= 0 && !n->isChannel(q->title()))
         return true;
     return false;
 }
@@ -179,10 +179,6 @@ bool IrcBufferPrivate::processMessage(IrcMessage* message)
         break;
     case IrcMessage::Notice:
         processed = processNoticeMessage(static_cast<IrcNoticeMessage*>(message));
-        if (processed) {
-            activity = message->timeStamp();
-            IrcBufferModelPrivate::get(model)->promoteBuffer(q);
-        }
         break;
     case IrcMessage::Numeric:
         processed = processNumericMessage(static_cast<IrcNumericMessage*>(message));
@@ -245,7 +241,7 @@ bool IrcBufferPrivate::processNamesMessage(IrcNamesMessage* message)
 
 bool IrcBufferPrivate::processNickMessage(IrcNickMessage* message)
 {
-    if (!(message->flags() & IrcMessage::Playback) && !message->nick().compare(name, Qt::CaseInsensitive)) {
+    if (!message->testFlag(IrcMessage::Playback) && !message->nick().compare(name, Qt::CaseInsensitive)) {
         setName(message->newNick());
         return true;
     }
@@ -255,7 +251,7 @@ bool IrcBufferPrivate::processNickMessage(IrcNickMessage* message)
 bool IrcBufferPrivate::processNoticeMessage(IrcNoticeMessage* message)
 {
     Q_UNUSED(message);
-    return true;
+    return false;
 }
 
 bool IrcBufferPrivate::processNumericMessage(IrcNumericMessage* message)
@@ -264,7 +260,7 @@ bool IrcBufferPrivate::processNumericMessage(IrcNumericMessage* message)
         setMonitorStatus(MonitorOnline);
     else if (message->code() == Irc::RPL_MONOFFLINE)
         setMonitorStatus(MonitorOffline);
-    return true;
+    return message->isImplicit();
 }
 
 bool IrcBufferPrivate::processPartMessage(IrcPartMessage* message)
@@ -293,7 +289,7 @@ bool IrcBufferPrivate::processTopicMessage(IrcTopicMessage* message)
 bool IrcBufferPrivate::processWhoReplyMessage(IrcWhoReplyMessage *message)
 {
     Q_UNUSED(message);
-    return true;
+    return false;
 }
 #endif // IRC_DOXYGEN
 

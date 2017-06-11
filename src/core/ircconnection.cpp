@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2008-2015 The Communi Project
+  Copyright (C) 2008-2016 The Communi Project
 
   You may use this file under the terms of BSD license as follows:
 
@@ -45,10 +45,10 @@
 #include <QMetaObject>
 #include <QMetaMethod>
 #include <QMetaEnum>
-#ifndef QT_NO_OPENSSL
+#ifndef QT_NO_SSL
 #include <QSslSocket>
 #include <QSslError>
-#endif // QT_NO_OPENSSL
+#endif // QT_NO_SSL
 #include <QDataStream>
 #include <QVariantMap>
 
@@ -222,6 +222,7 @@ IRC_BEGIN_NAMESPACE
     In addition, message type specific signals are provided for convenience:
     \li void <b>accountMessageReceived</b>(\ref IrcAccountMessage* message) (\b since 3.3)
     \li void <b>awayMessageReceived</b>(\ref IrcAwayMessage* message) (\b since 3.3)
+    \li void <b>batchMessageReceived</b>(\ref IrcBatchMessage* message) (\b since 3.5)
     \li void <b>capabilityMessageReceived</b>(\ref IrcCapabilityMessage* message)
     \li void <b>errorMessageReceived</b>(\ref IrcErrorMessage* message)
     \li void <b>hostChangeMessageReceived</b>(\ref IrcHostChangeMessage* message) (\b since 3.4)
@@ -297,11 +298,11 @@ void IrcConnectionPrivate::_irc_error(QAbstractSocket::SocketError error)
 {
     Q_Q(IrcConnection);
     if (error == QAbstractSocket::SslHandshakeFailedError) {
-        ircDebug(q) << "SSL HANDSHAKE ERROR";
+        ircDebug(q, IrcDebug::Error) << error;
         setStatus(IrcConnection::Error);
         emit q->secureError();
     } else if (!closed || (error != QAbstractSocket::RemoteHostClosedError && error != QAbstractSocket::UnknownSocketError)) {
-        ircDebug(q) << "SOCKET ERROR:" << error;
+        ircDebug(q, IrcDebug::Error) << error;
         emit q->socketError(error);
         setStatus(IrcConnection::Error);
         reconnect();
@@ -312,14 +313,14 @@ void IrcConnectionPrivate::_irc_sslErrors()
 {
     Q_Q(IrcConnection);
     QStringList errors;
-#ifndef QT_NO_OPENSSL
+#ifndef QT_NO_SSL
     QSslSocket* ssl = qobject_cast<QSslSocket*>(socket);
     if (ssl) {
         foreach (const QSslError& error, ssl->sslErrors())
             errors += error.errorString();
     }
 #endif
-    ircDebug(q) << "SSL ERRORS:" << errors;
+    ircDebug(q, IrcDebug::Error) << errors;
     emit q->secureError();
 }
 
@@ -429,10 +430,7 @@ void IrcConnectionPrivate::setStatus(IrcConnection::Status value)
                 q->sendRaw(data);
             pendingData.clear();
         }
-        if (status == IrcConnection::Connecting)
-            ircDebug(q) << "STATUS:" << status << qPrintable(host) << port;
-        else
-            ircDebug(q) << "STATUS:" << status;
+        ircDebug(q, IrcDebug::Status) << status << qPrintable(host) << port;
     }
 }
 
@@ -447,7 +445,7 @@ void IrcConnectionPrivate::setInfo(const QHash<QString, QString>& info)
         emit q->displayNameChanged(newName);
 }
 
-void IrcConnectionPrivate::receiveMessage(IrcMessage* msg)
+bool IrcConnectionPrivate::receiveMessage(IrcMessage* msg)
 {
     Q_Q(IrcConnection);
     if (msg->type() == IrcMessage::Join && msg->isOwn()) {
@@ -456,10 +454,10 @@ void IrcConnectionPrivate::receiveMessage(IrcMessage* msg)
         int code = static_cast<IrcNumericMessage*>(msg)->code();
         if (code == Irc::RPL_NAMREPLY || code == Irc::RPL_ENDOFNAMES) {
             if (!replies.contains(Irc::RPL_ENDOFNAMES))
-                msg->setFlags(msg->flags() | IrcMessage::Implicit);
-        } else if (code == Irc::RPL_TOPIC || code == Irc::RPL_TOPICWHOTIME || code == Irc::RPL_CHANNEL_URL || code == Irc::RPL_CREATIONTIME) {
+                msg->setFlag(IrcMessage::Implicit);
+        } else if (code == Irc::RPL_TOPIC || code == Irc::RPL_NOTOPIC || code == Irc::RPL_TOPICWHOTIME || code == Irc::RPL_CHANNEL_URL || code == Irc::RPL_CREATIONTIME) {
             if (!replies.contains(code))
-                msg->setFlags(msg->flags() | IrcMessage::Implicit);
+                msg->setFlag(IrcMessage::Implicit);
         }
         replies.insert(code);
     }
@@ -480,6 +478,9 @@ void IrcConnectionPrivate::receiveMessage(IrcMessage* msg)
             break;
         case IrcMessage::Away:
             emit q->awayMessageReceived(static_cast<IrcAwayMessage*>(msg));
+            break;
+        case IrcMessage::Batch:
+            emit q->batchMessageReceived(static_cast<IrcBatchMessage*>(msg));
             break;
         case IrcMessage::Capability:
             emit q->capabilityMessageReceived(static_cast<IrcCapabilityMessage*>(msg));
@@ -549,7 +550,11 @@ void IrcConnectionPrivate::receiveMessage(IrcMessage* msg)
             break;
         }
     }
-    msg->deleteLater();
+
+    if (!msg->parent() || msg->parent() == q)
+        msg->deleteLater();
+
+    return !filtered;
 }
 
 IrcCommand* IrcConnectionPrivate::createCtcpReply(IrcPrivateMessage* request)
@@ -1175,16 +1180,16 @@ void IrcConnection::setSocket(QAbstractSocket* socket)
  */
 bool IrcConnection::isSecure() const
 {
-#ifdef QT_NO_OPENSSL
+#ifdef QT_NO_SSL
     return false;
 #else
     return qobject_cast<QSslSocket*>(socket());
-#endif // QT_NO_OPENSSL
+#endif // QT_NO_SSL
 }
 
 void IrcConnection::setSecure(bool secure)
 {
-#ifdef QT_NO_OPENSSL
+#ifdef QT_NO_SSL
     if (secure) {
         qWarning("IrcConnection::setSecure(): the Qt build does not support SSL");
         return;
@@ -1205,31 +1210,15 @@ void IrcConnection::setSecure(bool secure)
         setSocket(new QTcpSocket(this));
         emit secureChanged(false);
     }
-#endif // !QT_NO_OPENSSL
+#endif // !QT_NO_SSL
 }
 
 /*!
-    \since 3.2
-    \property bool IrcConnection::secureSupported
-    This property holds whether SSL is supported.
-
-    The value may be \c false for the following reasons:
-    \li Qt was built without SSL support (\c QT_NO_SSL is defined), or
-    \li The platform does not support SSL (QSslSocket::supportsSsl() returns \c false).
-
-    \par Access function:
-    \li static bool <b>isSecureSupported</b>()
-
-    \sa secure, QSslSocket::supportsSsl()
+    \deprecated Use Irc::isSecureSupported() instead.
  */
-
 bool IrcConnection::isSecureSupported()
 {
-#ifdef QT_NO_OPENSSL
-    return false;
-#else
-    return QSslSocket::supportsSsl();
-#endif
+    return Irc::isSecureSupported();
 }
 
 /*!
@@ -1266,16 +1255,46 @@ void IrcConnection::setSaslMechanism(const QString& mechanism)
 }
 
 /*!
-    This property holds the list of supported SASL (Simple Authentication and Security Layer) mechanisms.
-
-    \par Access function:
-    \li static QStringList <b>supportedSaslMechanisms</b>()
-
-    \sa saslMechanism, \ref ircv3
+    \deprecated Use Irc::supportedSaslMechanisms() instead.
  */
 QStringList IrcConnection::supportedSaslMechanisms()
 {
-    return QStringList() << QLatin1String("PLAIN");
+    return Irc::supportedSaslMechanisms();
+}
+
+/*!
+    \since 3.5
+
+    This property holds CTCP (client to client protocol) replies.
+
+    This is a convenient request-reply map for customized static
+    CTCP replies. For dynamic replies, override createCtcpReply()
+    instead.
+
+    \note Set an empty reply to omit the automatic reply.
+
+    \par Access functions:
+    \li QVariantMap <b>ctcpReplies</b>() const
+    \li void <b>setCtcpReplies</b>(const QVariantMap& replies)
+
+    \par Notifier signal:
+    \li void <b>ctcpRepliesChanged</b>(const QVariantMap& replies)
+
+    \sa createCtcpReply()
+ */
+QVariantMap IrcConnection::ctcpReplies() const
+{
+    Q_D(const IrcConnection);
+    return d->ctcpReplies;
+}
+
+void IrcConnection::setCtcpReplies(const QVariantMap& replies)
+{
+    Q_D(IrcConnection);
+    if (d->ctcpReplies != replies) {
+        d->ctcpReplies = replies;
+        emit ctcpRepliesChanged(replies);
+    }
 }
 
 /*!
@@ -1366,15 +1385,18 @@ void IrcConnection::close()
 
     This method is provided for convenience. It is equal to:
     \code
-    IrcCommand* command = IrcCommand::createQuit(reason);
-    connection->sendCommand(command);
+    if (connection->isActive())
+        connection->sendCommand(IrcCommand::createQuit(reason));
     \endcode
 
     \sa IrcCommand::createQuit()
  */
 void IrcConnection::quit(const QString& reason)
 {
-    sendCommand(IrcCommand::createQuit(reason));
+    if (isConnected())
+        sendCommand(IrcCommand::createQuit(reason));
+    else
+        close();
 }
 
 /*!
@@ -1434,9 +1456,9 @@ bool IrcConnection::sendData(const QByteArray& data)
         if (isActive()) {
             const QByteArray cmd = data.left(5).toUpper();
             if (cmd.startsWith("PASS "))
-                ircDebug(this) << "->" << data.left(5) + QByteArray(data.mid(5).length(), 'x');
+                ircDebug(this, IrcDebug::Write) << data.left(5) + QByteArray(data.mid(5).length(), 'x');
             else
-                ircDebug(this) << "->" << data;
+                ircDebug(this, IrcDebug::Write) << data;
             if (!d->closed && data.length() >= 4) {
                 if (cmd.startsWith("QUIT") && (data.length() == 4 || QChar(data.at(4)).isSpace()))
                     d->closed = true;
@@ -1552,23 +1574,24 @@ void IrcConnection::removeCommandFilter(QObject* filter)
  */
 QByteArray IrcConnection::saveState(int version) const
 {
+    Q_D(const IrcConnection);
     QVariantMap args;
     args.insert("version", version);
-    args.insert("host", host());
-    args.insert("port", port());
-    args.insert("servers", servers());
-    args.insert("userName", userName());
-    args.insert("nickName", nickName());
-    args.insert("realName", realName());
-    args.insert("password", password());
-    args.insert("nickNames", nickNames());
+    args.insert("host", d->host);
+    args.insert("port", d->port);
+    args.insert("servers", d->servers);
+    args.insert("userName", d->userName);
+    args.insert("nickName", d->nickName);
+    args.insert("realName", d->realName);
+    args.insert("password", d->password);
+    args.insert("nickNames", d->nickNames);
     args.insert("displayName", displayName());
-    args.insert("userData", userData());
-    args.insert("encoding", encoding());
-    args.insert("enabled", isEnabled());
+    args.insert("userData", d->userData);
+    args.insert("encoding", d->encoding);
+    args.insert("enabled", d->enabled);
     args.insert("reconnectDelay", reconnectDelay());
     args.insert("secure", isSecure());
-    args.insert("saslMechanism", saslMechanism());
+    args.insert("saslMechanism", d->saslMechanism);
 
     QByteArray state;
     QDataStream out(&state, QIODevice::WriteOnly);
@@ -1587,6 +1610,7 @@ QByteArray IrcConnection::saveState(int version) const
  */
 bool IrcConnection::restoreState(const QByteArray& state, int version)
 {
+    Q_D(IrcConnection);
     if (isActive())
         return false;
 
@@ -1596,43 +1620,52 @@ bool IrcConnection::restoreState(const QByteArray& state, int version)
     if (in.status() != QDataStream::Ok || args.value("version", -1).toInt() != version)
         return false;
 
-    setHost(args.value("host", host()).toString());
-    setPort(args.value("port", port()).toInt());
-    setServers(args.value("servers", servers()).toStringList());
-    setUserName(args.value("userName", userName()).toString());
-    setNickName(args.value("nickName", nickName()).toString());
-    setRealName(args.value("realName", realName()).toString());
-    setPassword(args.value("password", password()).toString());
-    setNickNames(args.value("nickNames", nickNames()).toStringList());
-    if (nickNames().indexOf(nickName()) > 0)
-        setNickName(nickNames().first());
+    setHost(args.value("host", d->host).toString());
+    setPort(args.value("port", d->port).toInt());
+    setServers(args.value("servers", d->servers).toStringList());
+    setUserName(args.value("userName", d->userName).toString());
+    setNickName(args.value("nickName", d->nickName).toString());
+    setRealName(args.value("realName", d->realName).toString());
+    setPassword(args.value("password", d->password).toString());
+    setNickNames(args.value("nickNames", d->nickNames).toStringList());
+    if (!d->nickNames.isEmpty() && d->nickNames.indexOf(d->nickName) != 0)
+        setNickName(d->nickNames.first());
     setDisplayName(args.value("displayName").toString());
-    setUserData(args.value("userData", userData()).toMap());
-    setEncoding(args.value("encoding", encoding()).toByteArray());
-    setEnabled(args.value("enabled", isEnabled()).toBool());
+    setUserData(args.value("userData", d->userData).toMap());
+    setEncoding(args.value("encoding", d->encoding).toByteArray());
+    setEnabled(args.value("enabled", d->enabled).toBool());
     setReconnectDelay(args.value("reconnectDelay", reconnectDelay()).toInt());
     setSecure(args.value("secure", isSecure()).toBool());
-    setSaslMechanism(args.value("saslMechanism", saslMechanism()).toString());
+    setSaslMechanism(args.value("saslMechanism", d->saslMechanism).toString());
     return true;
 }
 
 /*!
     Creates a reply command for the CTCP \a request.
 
-    The default implementation handles the following CTCP requests: CLIENTINFO, PING, SOURCE, TIME and VERSION.
+    The default implementation first checks whether the \ref ctcpReplies
+    property contains a user-supplied reply for the request. In case it
+    does, the reply is sent automatically. In case there is no user-supplied
+    reply, the default implementation handles the following CTCP requests:
+    CLIENTINFO, PING, SOURCE, TIME and VERSION.
 
     Reimplement this function in order to alter or omit the default replies.
+
+    \sa ctcpReplies
  */
 IrcCommand* IrcConnection::createCtcpReply(IrcPrivateMessage* request) const
 {
+    Q_D(const IrcConnection);
     QString reply;
     QString type = request->content().split(" ", QString::SkipEmptyParts).value(0).toUpper();
-    if (type == "PING")
+    if (d->ctcpReplies.contains(type))
+        reply = type + QLatin1String(" ") + d->ctcpReplies.value(type).toString();
+    else if (type == "PING")
         reply = request->content();
     else if (type == "TIME")
         reply = QLatin1String("TIME ") + QLocale().toString(QDateTime::currentDateTime(), QLocale::ShortFormat);
     else if (type == "VERSION")
-        reply = QLatin1String("VERSION libcommuni ") + Irc::version() + QLatin1String(" - https://communi.github.io");
+        reply = QLatin1String("VERSION Communi ") + Irc::version() + QLatin1String(" - https://communi.github.io");
     else if (type == "SOURCE")
         reply = QLatin1String("SOURCE https://communi.github.io");
     else if (type == "CLIENTINFO")

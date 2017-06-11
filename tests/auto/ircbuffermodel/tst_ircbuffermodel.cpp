@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2015 The Communi Project
+ * Copyright (C) 2008-2016 The Communi Project
  *
  * This test is free, and not covered by the BSD license. There is no
  * restriction applied to their modification, redistribution, using and so on.
@@ -10,7 +10,9 @@
 #include "ircbuffermodel.h"
 #include "ircconnection.h"
 #include "ircchannel.h"
+#include "irccommand.h"
 #include "ircbuffer.h"
+#include "ircfilter.h"
 #include <QtTest/QtTest>
 #include "tst_ircclientserver.h"
 #include "tst_ircdata.h"
@@ -36,6 +38,7 @@ private slots:
     void testAIM();
     void testQML();
     void testWarnings();
+    void testMonitor();
 };
 
 Q_DECLARE_METATYPE(QModelIndex)
@@ -65,6 +68,7 @@ void tst_IrcBufferModel::testDefaults()
     QVERIFY(!model.network());
     QVERIFY(model.bufferPrototype());
     QVERIFY(model.channelPrototype());
+    QVERIFY(!model.isMonitorEnabled());
 }
 
 void tst_IrcBufferModel::testBufferInit()
@@ -779,8 +783,9 @@ void tst_IrcBufferModel::testChanges()
     QCOMPARE(rowsInsertedSpy.last().at(1).toInt(), nextIndex);
     QCOMPARE(rowsInsertedSpy.last().at(2).toInt(), nextIndex);
 
+    // note: notices are not targeted since 3.5
     QVERIFY(waitForWritten(":ChanServ!ChanServ@services. NOTICE communi :fake..."));
-    QCOMPARE(messageIgnoredSpy.count(), messageIgnoredCount);
+    QCOMPARE(messageIgnoredSpy.count(), ++messageIgnoredCount);
 
     QCOMPARE(bufferModel.count(), buffers.count());
     QCOMPARE(bufferModel.buffers(), buffers);
@@ -1104,8 +1109,9 @@ void tst_IrcBufferModel::testChanges()
 
     QCOMPARE(rowsInsertedSpy.count(), rowsInsertedCount);
 
+    // note: implicit replies are not targeted since 3.5
     waitForWritten(":moorcock.freenode.net 324 communi #freenode +s");
-    QCOMPARE(messageIgnoredSpy.count(), messageIgnoredCount);
+    QCOMPARE(messageIgnoredSpy.count(), ++messageIgnoredCount);
     QCOMPARE(freenode->mode(), QString("+s"));
 
     QVERIFY(waitForWritten(":jpnurmi!jpnurmi@qt/jpnurmi KICK #freenode communi"));
@@ -1405,8 +1411,8 @@ void tst_IrcBufferModel::testAIM()
     QCOMPARE(aim->data(ci, Irc::NameRole).toString(), c->name());
     QVERIFY(aim->data(oi, Irc::NameRole).toString().isEmpty());
 
-    QVERIFY(aim->data(ai, Irc::PrefixRole).toString().isEmpty());
-    QVERIFY(aim->data(bi, Irc::PrefixRole).toString().isEmpty());
+    QCOMPARE(aim->data(ai, Irc::PrefixRole).toString(), QString("#"));
+    QCOMPARE(aim->data(bi, Irc::PrefixRole).toString(), QString("#"));
     QVERIFY(aim->data(ci, Irc::PrefixRole).toString().isEmpty());
     QVERIFY(aim->data(oi, Irc::PrefixRole).toString().isEmpty());
 }
@@ -1454,6 +1460,57 @@ void tst_IrcBufferModel::testWarnings()
 
     IrcConnection another;
     model.setConnection(&another);
+}
+
+class TestCommandFilter : public QObject, public IrcCommandFilter
+{
+    Q_OBJECT
+    Q_INTERFACES(IrcCommandFilter)
+
+public:
+    TestCommandFilter(IrcConnection* connection) { connection->installCommandFilter(this); }
+    bool commandFilter(IrcCommand* command) { commands += command->toString(); return false; }
+    QStringList commands;
+};
+
+void tst_IrcBufferModel::testMonitor()
+{
+    TestCommandFilter filter(connection);
+
+    IrcBufferModel model(connection);
+    model.setMonitorEnabled(true);
+    QVERIFY(model.isMonitorEnabled());
+
+    connection->open();
+    QVERIFY(waitForOpened());
+    QVERIFY(waitForWritten(tst_IrcData::welcome("freenode")));
+    QVERIFY(connection->network()->numericLimit(IrcNetwork::MonitorCount) > 0);
+
+    filter.commands.clear();
+
+    IrcBuffer* buffer = model.add("jirssi");
+    QVERIFY(!buffer->isActive());
+    QCOMPARE(filter.commands.count(), 1);
+    QCOMPARE(filter.commands.last(), QString("MONITOR + jirssi"));
+
+    QVERIFY(waitForWritten(":card.freenode.net 730 * :jirssi!~jpnurmi@88.95.51.136"));
+    QVERIFY(buffer->isActive());
+
+    QVERIFY(waitForWritten(":card.freenode.net 731 jipsu :jirssi"));
+    QVERIFY(!buffer->isActive());
+
+    model.remove("jirssi");
+    QCOMPARE(filter.commands.count(), 2);
+    QCOMPARE(filter.commands.last(), QString("MONITOR - jirssi"));
+
+    filter.commands.clear();
+
+    // don't monitor channels
+    buffer = model.add("#channel");
+    QCOMPARE(model.channels(), QStringList() << "#channel");
+    QVERIFY(filter.commands.isEmpty());
+    delete buffer;
+    QVERIFY(filter.commands.isEmpty());
 }
 
 QTEST_MAIN(tst_IrcBufferModel)

@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2008-2015 The Communi Project
+  Copyright (C) 2008-2016 The Communi Project
 
   You may use this file under the terms of BSD license as follows:
 
@@ -308,6 +308,22 @@ IrcConnection* IrcCommand::connection() const
 {
     Q_D(const IrcCommand);
     return d->connection;
+}
+
+/*!
+    \since 3.5
+
+    This property holds the network that this command was sent to.
+
+    The network is only set if the command has been passed to IrcConnection::sendCommand().
+
+    \par Access function:
+    \li \ref IrcNetwork* <b>network</b>() const
+ */
+IrcNetwork* IrcCommand::network() const
+{
+    Q_D(const IrcCommand);
+    return d->connection ? d->connection->network() : 0;
 }
 
 /*!

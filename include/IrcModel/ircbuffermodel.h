@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2008-2015 The Communi Project
+  Copyright (C) 2008-2016 The Communi Project
 
   You may use this file under the terms of BSD license as follows:
 
@@ -31,6 +31,7 @@
 
 #include <Irc>
 #include <IrcGlobal>
+#include <QtCore/qmetatype.h>
 #include <QtCore/qstringlist.h>
 #include <QtCore/qabstractitemmodel.h>
 
@@ -159,6 +160,7 @@ private:
     Q_DISABLE_COPY(IrcBufferModel)
 
     Q_PRIVATE_SLOT(d_func(), void _irc_connected())
+    Q_PRIVATE_SLOT(d_func(), void _irc_initialized())
     Q_PRIVATE_SLOT(d_func(), void _irc_disconnected())
     Q_PRIVATE_SLOT(d_func(), void _irc_bufferDestroyed(IrcBuffer*))
     Q_PRIVATE_SLOT(d_func(), void _irc_restoreBuffers())
@@ -166,5 +168,7 @@ private:
 };
 
 IRC_END_NAMESPACE
+
+Q_DECLARE_METATYPE(IRC_PREPEND_NAMESPACE(IrcBufferModel*))
 
 #endif // IRCBUFFERMODEL_H
