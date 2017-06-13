@@ -1,25 +1,11 @@
 #!/usr/bin/make -f
 
 #export DH_VERBOSE=1
-export PYTHONDONTWRITEBYTECODE=1
-
-configure:
-
-build: configure
-	dh_testdir
-	qmake-qt4 -config verbose -config no_rpath
-	make
+include /usr/share/dpkg/default.mk
 
 override_dh_auto_configure:
+	qmake -config no_rpath -config debug
 override_dh_auto_test:
-override_dh_strip:
-	dh_strip --dbg-package=libcommuni-dbg
-
-install: build
-	dh_testroot
-	dh_prep
-	dh_installdirs
-	make install INSTALL_ROOT=$(CURDIR)/debian/tmp/usr
 
 %:
-	dh $@
+	dh $@ --buildsystem=qmake --dbg-package=libcommuni-dbg
