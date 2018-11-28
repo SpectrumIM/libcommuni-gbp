@@ -1,8 +1,8 @@
 Source: communi
 Section: net
 Priority: optional
-Maintainer: Jan Kaluza <hanzz.k@gmail.com>
-Uploaders: Jan Kaluza <hanzz.k@gmail.com>
+Maintainer: Vitaly Takmazov <vitalyster@gmail.com>
+Uploaders: Vitaly Takmazov <vitalyster@gmail.com>
 Build-Depends: debhelper (>= 7), libssl-dev, qtbase5-dev, qtdeclarative5-dev
 Standards-Version: 3.9.6
 Homepage: http://communi.github.com/
