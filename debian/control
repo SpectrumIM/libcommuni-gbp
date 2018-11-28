@@ -3,7 +3,7 @@ Section: net
 Priority: optional
 Maintainer: Jan Kaluza <hanzz.k@gmail.com>
 Uploaders: Jan Kaluza <hanzz.k@gmail.com>
-Build-Depends: debhelper (>= 7), libssl-dev (>= 0.9.8g), libqt4-dev (>= 4.5.0)
+Build-Depends: debhelper (>= 7), libssl-dev, qtbase5-dev, qtdeclarative5-dev
 Standards-Version: 3.9.6
 Homepage: http://communi.github.com/
 

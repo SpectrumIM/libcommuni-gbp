@@ -1,5 +1,6 @@
 /usr/lib/*/libIrcCore.so.*
 /usr/lib/*/libIrcModel.so.*
 /usr/lib/*/libIrcUtil.so.*
-/usr/lib/*/qt4/imports/Communi/libcommuniplugin.so
-/usr/lib/*/qt4/imports/Communi/qmldir
+/usr/lib/*/qt5/qml/Communi/libcommuniplugin.so
+/usr/lib/*/qt5/qml/Communi/plugins.qmltypes
+/usr/lib/*/qt5/qml/Communi/qmldir

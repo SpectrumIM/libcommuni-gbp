@@ -3,7 +3,7 @@
 #export DH_VERBOSE=1
 include /usr/share/dpkg/default.mk
 
-export QT_SELECT=qt4
+export QT_SELECT=qt5
 
 override_dh_auto_configure:
 	qmake -config no_rpath -config debug
