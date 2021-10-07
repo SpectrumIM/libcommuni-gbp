@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 The Communi Project
+ * Copyright (C) 2008-2020 The Communi Project
  *
  * This test is free, and not covered by the BSD license. There is no
  * restriction applied to their modification, redistribution, using and so on.
@@ -36,7 +36,7 @@ public:
     {
     }
 
-    virtual bool write(const QByteArray& data)
+    bool write(const QByteArray& data) override
     {
         written = data;
         return IrcProtocol::write(data);
@@ -354,7 +354,7 @@ void tst_IrcConnection::testSocket_data()
 {
     QTest::addColumn<QAbstractSocket*>("socket");
 
-    QTest::newRow("null") << static_cast<QAbstractSocket*>(0);
+    QTest::newRow("null") << static_cast<QAbstractSocket*>(nullptr);
     QTest::newRow("tcp") << static_cast<QAbstractSocket*>(new QTcpSocket(this));
 #ifndef QT_NO_SSL
     QTest::newRow("ssl") << static_cast<QAbstractSocket*>(new QSslSocket(this));
@@ -514,7 +514,7 @@ void tst_IrcConnection::testNoSasl()
     QVERIFY(clientSocket->waitForBytesWritten(1000));
     QVERIFY(serverSocket->waitForReadyRead(1000));
     written = serverSocket->readAll();
-    QVERIFY(written.contains("PASS secret"));
+    QVERIFY(written.contains("PASS :secret"));
     QVERIFY(written.contains("CAP END"));
 }
 
@@ -1098,7 +1098,7 @@ class MsgFilter : public QObject, public IrcMessageFilter
     Q_INTERFACES(IrcMessageFilter)
 
 public:
-    MsgFilter() : count(0), type(IrcMessage::Unknown), flags(IrcMessage::None)
+    MsgFilter() :  flags(IrcMessage::None)
     {
     }
 
@@ -1111,7 +1111,7 @@ public:
         values.clear();
     }
 
-    bool messageFilter(IrcMessage* message)
+    bool messageFilter(IrcMessage* message) override
     {
         ++count;
         type = message->type();
@@ -1125,10 +1125,10 @@ public:
     }
 
 public:
-    int count;
+    int count = 0;
     QVariantMap values;
     QByteArray properties;
-    IrcMessage::Type type;
+    IrcMessage::Type type = IrcMessage::Unknown;
     IrcMessage::Flags flags;
 };
 
@@ -1444,7 +1444,7 @@ void tst_IrcConnection::testServerTime()
 void tst_IrcConnection::testSendCommand()
 {
     IrcConnection conn;
-    QVERIFY(!conn.sendCommand(0));
+    QVERIFY(!conn.sendCommand(nullptr));
     QVERIFY(!conn.sendCommand(IrcCommand::createQuit()));
 
     TestProtocol* protocol = new TestProtocol(connection);
@@ -1457,7 +1457,7 @@ void tst_IrcConnection::testSendCommand()
     QVERIFY(waitForOpened());
 
     QVERIFY(connection->sendCommand(IrcCommand::createQuit()));
-    QVERIFY(!connection->sendCommand(0));
+    QVERIFY(!connection->sendCommand(nullptr));
     QVERIFY(protocol->written.contains("QUIT"));
 }
 
@@ -1494,7 +1494,7 @@ public:
         commandFilterEnabled = false;
     }
 
-    bool messageFilter(IrcMessage*)
+    bool messageFilter(IrcMessage*) override
     {
         ++messageFiltered;
         if (commitSuicide)
@@ -1502,7 +1502,7 @@ public:
         return messageFilterEnabled;
     }
 
-    bool commandFilter(IrcCommand*)
+    bool commandFilter(IrcCommand*) override
     {
         ++commandFiltered;
         if (commitSuicide)
@@ -1764,7 +1764,7 @@ void tst_IrcConnection::testDebug()
     QString str;
     QDebug dbg(&str);
 
-    dbg << static_cast<IrcConnection*>(0);
+    dbg << static_cast<IrcConnection*>(nullptr);
     QCOMPARE(str.trimmed(), QString::fromLatin1("IrcConnection(0x0)"));
     str.clear();
 

@@ -26,60 +26,57 @@
   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-/*!
-    \file irccore.h
-    \brief \#include &lt;\ref core "IrcCore"&gt;
- */
+#ifndef IRCCORE_P_H
+#define IRCCORE_P_H
 
-/*!
-    \file ircmodel.h
-    \brief \#include &lt;\ref models "IrcModel"&gt;
- */
+#include "ircglobal.h"
 
-/*!
-    \file ircutil.h
-    \brief \#include &lt;\ref util "IrcUtil"&gt;
- */
+#include <QtCore/qlist.h>
+#include <QtCore/qset.h>
+#include <QtCore/qstring.h>
 
-/*!
-    \defgroup core IrcCore
-    \brief Core classes to manage IRC connections, receive messages and send commands.
+IRC_BEGIN_NAMESPACE
 
-    In order to enable the module, add the following lines to your qmake project (.pro) file:
-    \code
-    CONFIG += communi
-    COMMUNI += core
-    \endcode
+namespace IrcPrivate {
+#if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
+    template <typename T>
+    QSet<T> listToSet(const QList<T> &list) { return QSet<T>(list.cbegin(), list.cend()); }
+    template <typename T>
+    static inline QList<T> setToList(const QSet<T> &set) { return QList<T>(set.cbegin(), set.cend()); }
+#else
+    template <typename T>
+    static inline QSet<T> listToSet(const QList<T> &list) { return list.toSet(); }
+    template <typename T>
+    static inline QList<T> setToList(const QSet<T> &set) { return set.toList(); }
+#endif
+}
 
-    This sets up the necessary include paths and linker rules in order to use the module.
- */
+#if QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
+namespace Qt {
+    const QString::SplitBehavior SkipEmptyParts = QString::SkipEmptyParts;
+}
+#endif
 
-/*!
-    \defgroup models IrcModel
-    \brief Model classes to keep track of queries, channels and users.
+#ifndef Q_FALLTHROUGH
+#   if defined(__cplusplus)
+#       if __has_cpp_attribute(clang::fallthrough)
+#           define Q_FALLTHROUGH() [[clang::fallthrough]]
+#       elif __has_cpp_attribute(gnu::fallthrough)
+#           define Q_FALLTHROUGH() [[gnu::fallthrough]]
+#       elif __has_cpp_attribute(fallthrough)
+#           define Q_FALLTHROUGH() [[fallthrough]]
+#       endif
+#   endif
+#endif
 
-    In order to enable the module, add the following lines to your qmake project (.pro) file:
-    \code
-    CONFIG += communi
-    COMMUNI += core model
-    \endcode
+#ifndef Q_FALLTHROUGH
+#   if (defined(Q_CC_GNU) && Q_CC_GNU >= 700) && !defined(Q_CC_INTEL)
+#       define Q_FALLTHROUGH() __attribute__((fallthrough))
+#   else
+#       define Q_FALLTHROUGH() (void)0
+#   endif
+#endif
 
-    This sets up the necessary include paths and linker rules in order to use the module.
+IRC_END_NAMESPACE
 
-    \note IrcModel depends on \ref core "IrcCore"
- */
-
-/*!
-    \defgroup util IrcUtil
-    \brief Miscellaneous utility classes for common IRC client related needs.
-
-    In order to enable the module, add the following lines to your qmake project (.pro) file:
-    \code
-    CONFIG += communi
-    COMMUNI += core model util
-    \endcode
-
-    This sets up the necessary include paths and linker rules in order to use the module.
-
-    \note IrcUtil depends on \ref core "IrcCore" and \ref models "IrcModel"
- */
+#endif // IRCCORE_P_H

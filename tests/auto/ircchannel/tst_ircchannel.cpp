@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 The Communi Project
+ * Copyright (C) 2008-2020 The Communi Project
  *
  * This test is free, and not covered by the BSD license. There is no
  * restriction applied to their modification, redistribution, using and so on.
@@ -53,7 +53,7 @@ void tst_IrcChannel::testDebug()
     QString str;
     QDebug dbg(&str);
 
-    dbg << static_cast<IrcChannel*>(0);
+    dbg << static_cast<IrcChannel*>(nullptr);
     QCOMPARE(str.trimmed(), QString::fromLatin1("IrcChannel(0x0)"));
     str.clear();
 

@@ -31,8 +31,9 @@ PUB_HEADERS += $$INCDIR/ircnetwork.h
 PUB_HEADERS += $$INCDIR/ircprotocol.h
 
 PRIV_HEADERS  = $$INCDIR/irccommand_p.h
-PRIV_HEADERS  = $$INCDIR/ircconnection_p.h
-PRIV_HEADERS  = $$INCDIR/ircdebug_p.h
+PRIV_HEADERS += $$INCDIR/ircconnection_p.h
+PRIV_HEADERS += $$INCDIR/irccore_p.h
+PRIV_HEADERS += $$INCDIR/ircdebug_p.h
 PRIV_HEADERS += $$INCDIR/ircmessage_p.h
 PRIV_HEADERS += $$INCDIR/ircmessagecomposer_p.h
 PRIV_HEADERS += $$INCDIR/ircmessagedecoder_p.h
@@ -53,16 +54,24 @@ SOURCES += $$PWD/ircmessagedecoder.cpp
 SOURCES += $$PWD/ircnetwork.cpp
 SOURCES += $$PWD/ircprotocol.cpp
 
-include(../3rdparty/mozilla/mozilla.pri)
+include(pkg.pri)
 
-CONFIG(icu, icu|no_icu) {
+!icu:!uchardet {
+    !no_uchardet {
+        pkgExists(uchardet): CONFIG += uchardet
+    } else:!no_icu {
+        pkgExists(icu)|pkgExists(icu-i18n): CONFIG += icu
+    }
+}
+
+CONFIG(icu, icu|no_icu|uchardet) {
+    include(icu.pri)
     DEFINES += HAVE_ICU
     SOURCES += $$PWD/ircmessagedecoder_icu.cpp
-    include(../3rdparty/icu/icu.pri)
-} else:CONFIG(uchardet, uchardet|no_uchardet) {
+} else:CONFIG(uchardet, uchardet|no_uchardet|icu) {
+    include(uchardet.pri)
     DEFINES += HAVE_UCHARDET
     SOURCES += $$PWD/ircmessagedecoder_uchardet.cpp
-    include(../3rdparty/uchardet-0.0.1/uchardet.pri)
 } else {
     SOURCES += $$PWD/ircmessagedecoder_none.cpp
 }

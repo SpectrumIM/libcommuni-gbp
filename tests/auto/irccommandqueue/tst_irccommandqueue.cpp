@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 The Communi Project
+ * Copyright (C) 2008-2020 The Communi Project
  *
  * This test is free, and not covered by the BSD license. There is no
  * restriction applied to their modification, redistribution, using and so on.
@@ -95,7 +95,7 @@ class TestCommandFilter : public QObject, public IrcCommandFilter
 
 public:
     TestCommandFilter(IrcConnection* connection) { connection->installCommandFilter(this); }
-    bool commandFilter(IrcCommand *command) { commands += command; return true; }
+    bool commandFilter(IrcCommand *command) override { commands += command; return true; }
     QList<IrcCommand*> commands;
 };
 

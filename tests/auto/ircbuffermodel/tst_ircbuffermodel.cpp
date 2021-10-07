@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 The Communi Project
+ * Copyright (C) 2008-2020 The Communi Project
  *
  * This test is free, and not covered by the BSD license. There is no
  * restriction applied to their modification, redistribution, using and so on.
@@ -563,11 +563,11 @@ void tst_IrcBufferModel::testPrototypes()
     QVERIFY(bufferProtoSpy.isValid());
     QVERIFY(channelProtoSpy.isValid());
 
-    model.setBufferPrototype(0);
+    model.setBufferPrototype(nullptr);
     QVERIFY(model.bufferPrototype());
     QCOMPARE(bufferProtoSpy.count(), 1);
 
-    model.setChannelPrototype(0);
+    model.setChannelPrototype(nullptr);
     QVERIFY(model.channelPrototype());
     QCOMPARE(channelProtoSpy.count(), 1);
 
@@ -783,9 +783,8 @@ void tst_IrcBufferModel::testChanges()
     QCOMPARE(rowsInsertedSpy.last().at(1).toInt(), nextIndex);
     QCOMPARE(rowsInsertedSpy.last().at(2).toInt(), nextIndex);
 
-    // note: notices are not targeted since 3.5
     QVERIFY(waitForWritten(":ChanServ!ChanServ@services. NOTICE communi :fake..."));
-    QCOMPARE(messageIgnoredSpy.count(), ++messageIgnoredCount);
+    QCOMPARE(messageIgnoredSpy.count(), messageIgnoredCount);
 
     QCOMPARE(bufferModel.count(), buffers.count());
     QCOMPARE(bufferModel.buffers(), buffers);
@@ -1350,7 +1349,7 @@ void tst_IrcBufferModel::testAIM()
     IrcBuffer* a = bufferModel.add("#a");
     IrcBuffer* b = bufferModel.add("#b");
     IrcBuffer* c = bufferModel.add("c");
-    IrcBuffer* o = 0;
+    IrcBuffer* o = nullptr;
 
     QAbstractItemModel* aim = &bufferModel;
     QModelIndex ai = aim->index(0, 0);
@@ -1469,7 +1468,7 @@ class TestCommandFilter : public QObject, public IrcCommandFilter
 
 public:
     TestCommandFilter(IrcConnection* connection) { connection->installCommandFilter(this); }
-    bool commandFilter(IrcCommand* command) { commands += command->toString(); return false; }
+    bool commandFilter(IrcCommand* command) override { commands += command->toString(); return false; }
     QStringList commands;
 };
 

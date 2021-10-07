@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 The Communi Project
+ * Copyright (C) 2008-2020 The Communi Project
  *
  * This test is free, and not covered by the BSD license. There is no
  * restriction applied to their modification, redistribution, using and so on.
@@ -143,8 +143,9 @@ void tst_IrcTextFormat::testUrls_data()
     QTest::newRow("percent") << defaultPattern << "http://en.wikipedia.org/wiki/Shamir%27s_Secret_Sharing" << "<a href='http://en.wikipedia.org/wiki/Shamir%27s_Secret_Sharing'>http://en.wikipedia.org/wiki/Shamir%27s_Secret_Sharing</a>" << (QList<QUrl>() << QUrl("http://en.wikipedia.org/wiki/Shamir%27s_Secret_Sharing"));
     QTest::newRow("parentheses") << defaultPattern << "http://en.wikipedia.org/wiki/Qt_(software)" << "<a href='http://en.wikipedia.org/wiki/Qt_%28software%29'>http://en.wikipedia.org/wiki/Qt_(software)</a>" << (QList<QUrl>() << QUrl("http://en.wikipedia.org/wiki/Qt_(software)"));
     QTest::newRow("hash & comma") << defaultPattern << "https://codereview.qt-project.org/#change,1" << "<a href='https://codereview.qt-project.org/#change,1'>https://codereview.qt-project.org/#change,1</a>" << (QList<QUrl>() << QUrl("https://codereview.qt-project.org/#change,1"));
-    QTest::newRow("equal & question & ampersand") << defaultPattern << "https://www.google.no/imghp?hl=en&tab=wi" << "<a href='https://www.google.no/imghp?hl=en&tab=wi'>https://www.google.no/imghp?hl=en&tab=wi</a>" << (QList<QUrl>() << QUrl("https://www.google.no/imghp?hl=en&tab=wi"));
+    QTest::newRow("equal & question & ampersand") << defaultPattern << "https://www.google.no/imghp?hl=en&tab=wi" << "<a href='https://www.google.no/imghp?hl=en&tab=wi'>https://www.google.no/imghp?hl=en&amp;tab=wi</a>" << (QList<QUrl>() << QUrl("https://www.google.no/imghp?hl=en&tab=wi"));
     QTest::newRow("github commits") << defaultPattern << "https://github.com/communi/libcommuni/compare/ebf3c8ea47dc...19d66ddcb122" << "<a href='https://github.com/communi/libcommuni/compare/ebf3c8ea47dc...19d66ddcb122'>https://github.com/communi/libcommuni/compare/ebf3c8ea47dc...19d66ddcb122</a>" << (QList<QUrl>() << QUrl("https://github.com/communi/libcommuni/compare/ebf3c8ea47dc...19d66ddcb122"));
+    QTest::newRow("gerrit gitweb") << defaultPattern << "https://codereview.qt-project.org/gitweb?p=qt%2Fqtquickcontrols2.git;a=commit;h=f57f2d9e45b177232b76bde07ff96ef3e43fe5b1" << "<a href='https://codereview.qt-project.org/gitweb?p=qt%2Fqtquickcontrols2.git;a=commit;h=f57f2d9e45b177232b76bde07ff96ef3e43fe5b1'>https://codereview.qt-project.org/gitweb?p=qt%2Fqtquickcontrols2.git;a=commit;h=f57f2d9e45b177232b76bde07ff96ef3e43fe5b1</a>" << (QList<QUrl>() << QUrl("https://codereview.qt-project.org/gitweb?p=qt%2Fqtquickcontrols2.git;a=commit;h=f57f2d9e45b177232b76bde07ff96ef3e43fe5b1"));
     QTest::newRow("multiple") << defaultPattern << "www.fi ftp.funet.fi jpnurmi@gmail.com" << "<a href='http://www.fi'>www.fi</a> <a href='ftp://ftp.funet.fi'>ftp.funet.fi</a> <a href='mailto:jpnurmi@gmail.com'>jpnurmi@gmail.com</a>" << (QList<QUrl>() << QUrl("http://www.fi") << QUrl("ftp://ftp.funet.fi") << QUrl("mailto:jpnurmi@gmail.com"));
     QTest::newRow("empty pattern") << QString() << "www.fi ftp.funet.fi jpnurmi@gmail.com" << "www.fi ftp.funet.fi jpnurmi@gmail.com" << QList<QUrl>();
 

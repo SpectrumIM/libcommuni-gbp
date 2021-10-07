@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 The Communi Project
+ * Copyright (C) 2008-2020 The Communi Project
  *
  * This example is free, and not covered by the BSD license. There is no
  * restriction applied to their modification, redistribution, using and so on.
@@ -19,7 +19,7 @@ class IrcBot : public IrcConnection
     Q_OBJECT
 
 public:
-    IrcBot(QObject* parent = 0);
+    IrcBot(QObject* parent = nullptr);
 
 public slots:
     void join(QString channel);
