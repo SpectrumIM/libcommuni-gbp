@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 The Communi Project
+ * Copyright (C) 2008-2020 The Communi Project
  *
  * This example is free, and not covered by the BSD license. There is no
  * restriction applied to their modification, redistribution, using and so on.
@@ -8,6 +8,9 @@
  */
 
 #include <QtCore>
+#if (QT_VERSION) >= (QT_VERSION_CHECK(5, 10, 0))
+#include <QRandomGenerator>
+#endif
 #include "ircbot.h"
 
 int main(int argc, char* argv[])
@@ -16,12 +19,16 @@ int main(int argc, char* argv[])
 
     // enable debug output
     qputenv("IRC_DEBUG", "1");
-    qsrand(QTime::currentTime().msec());
 
     IrcBot bot;
     bot.setHost("irc.freenode.net");
     bot.setUserName("communi");
+#if (QT_VERSION) >= (QT_VERSION_CHECK(5, 10, 0))
+    bot.setNickName("Bot" + QString::number(QRandomGenerator::global()->bounded(1, 10000)));
+#else
+    qsrand(QTime::currentTime().msec());
     bot.setNickName("Bot" + QString::number(qrand() % 9999));
+#endif
     bot.setRealName("Communi " + Irc::version() + " example bot");
 
     bool joined = false;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 The Communi Project
+ * Copyright (C) 2008-2020 The Communi Project
  *
  * This test is free, and not covered by the BSD license. There is no
  * restriction applied to their modification, redistribution, using and so on.
@@ -64,7 +64,7 @@ void tst_IrcCompleter::testBuffer()
     QCOMPARE(spy.count(), 1);
     QCOMPARE(spy.last().at(0).value<IrcBuffer*>(), buffer);
 
-    completer.setBuffer(0);
+    completer.setBuffer(nullptr);
     QVERIFY(!completer.buffer());
     QCOMPARE(spy.count(), 2);
     QVERIFY(!spy.last().at(0).value<IrcBuffer*>());
@@ -87,7 +87,7 @@ void tst_IrcCompleter::testParser()
     QCOMPARE(spy.count(), 1);
     QCOMPARE(spy.last().at(0).value<IrcCommandParser*>(), parser);
 
-    completer.setParser(0);
+    completer.setParser(nullptr);
     QVERIFY(!completer.parser());
     QCOMPARE(spy.count(), 2);
     QVERIFY(!spy.last().at(0).value<IrcCommandParser*>());

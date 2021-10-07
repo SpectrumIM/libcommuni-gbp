@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2008-2016 The Communi Project
+  Copyright (C) 2008-2020 The Communi Project
 
   You may use this file under the terms of BSD license as follows:
 
@@ -43,7 +43,7 @@ class IrcQmlFilter : public QObject,
     Q_PROPERTY(IrcConnection* connection READ connection WRITE setConnection NOTIFY connectionChanged)
 
 public:
-    IrcQmlFilter(QObject* parent = 0) : QObject(parent), conn(0) { }
+    IrcQmlFilter(QObject* parent = nullptr) : QObject(parent), conn(nullptr) { }
 
     IrcConnection* connection() const { return conn; }
     void setConnection(IrcConnection* connection)
@@ -62,7 +62,7 @@ public:
         }
     }
 
-    bool commandFilter(IrcCommand* cmd)
+    bool commandFilter(IrcCommand* cmd) override
     {
         // QML: QVariant commandFilter(QVariant)
         const QMetaObject* mo = metaObject();
@@ -76,7 +76,7 @@ public:
         return false;
     }
 
-    bool messageFilter(IrcMessage* msg)
+    bool messageFilter(IrcMessage* msg) override
     {
         // QML: QVariant messageFilter(QVariant)
         const QMetaObject* mo = metaObject();
@@ -103,7 +103,7 @@ class CommuniPlugin : public QQmlExtensionPlugin
     Q_PLUGIN_METADATA(IID "Communi.QQmlExtensionInterface")
 
 public:
-    void registerTypes(const char* uri) {
+    void registerTypes(const char* uri) override {
 //! [qml-register-types]
         // IrcCore
         Irc::registerMetaTypes();

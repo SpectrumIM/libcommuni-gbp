@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2008-2016 The Communi Project
+  Copyright (C) 2008-2020 The Communi Project
 
   You may use this file under the terms of BSD license as follows:
 
@@ -43,7 +43,7 @@ class IrcQmlFilter : public QObject,
     Q_PROPERTY(IrcConnection* connection READ connection WRITE setConnection NOTIFY connectionChanged)
 
 public:
-    IrcQmlFilter(QObject* parent = 0) : QObject(parent), conn(0) { }
+    IrcQmlFilter(QObject* parent = nullptr) : QObject(parent), conn(nullptr) { }
 
     IrcConnection* connection() const { return conn; }
     void setConnection(IrcConnection* connection)

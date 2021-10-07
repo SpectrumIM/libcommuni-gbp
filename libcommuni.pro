@@ -73,14 +73,14 @@ QMAKE_CACHE = $${OUT_PWD}$${QMAKE_DIR_SEP}.qmake.cache
 write_file($$QMAKE_CACHE, CONFIG_LINES)
 
 OTHER_FILES += .gitignore
-OTHER_FILES += .travis.yml
+OTHER_FILES += .github/workflows/ci.yml
 OTHER_FILES += AUTHORS
-OTHER_FILES += CHANGELOG
+OTHER_FILES += CHANGELOG.md
 OTHER_FILES += configure
 OTHER_FILES += Doxyfile
 OTHER_FILES += INSTALL
 OTHER_FILES += LICENSE
-OTHER_FILES += README
+OTHER_FILES += README.md
 OTHER_FILES += features/communi.prf
 
 include(doc/doc.pri)

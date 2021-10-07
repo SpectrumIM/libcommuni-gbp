@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 The Communi Project
+ * Copyright (C) 2008-2020 The Communi Project
  *
  * This test is free, and not covered by the BSD license. There is no
  * restriction applied to their modification, redistribution, using and so on.
@@ -95,7 +95,7 @@ private slots:
 
 void tst_IrcMessage::testDefaults()
 {
-    IrcMessage msg(0);
+    IrcMessage msg(nullptr);
     QVERIFY(!msg.isValid());
     QVERIFY(!msg.connection());
     QCOMPARE(msg.type(), IrcMessage::Unknown);
@@ -154,7 +154,7 @@ void tst_IrcMessage::testPrefix()
     QFETCH(QString, ident);
     QFETCH(QString, host);
 
-    IrcMessage msg(0);
+    IrcMessage msg(nullptr);
     msg.setPrefix(prefix);
     QCOMPARE(msg.prefix(), expected);
     QCOMPARE(msg.nick(), nick);
@@ -200,7 +200,7 @@ void tst_IrcMessage::testParameters()
 
 void tst_IrcMessage::testFlags()
 {
-    IrcMessage msg(0);
+    IrcMessage msg(nullptr);
     msg.setPrefix("a!b@c");
     QCOMPARE(msg.flags(), IrcMessage::None);
 
@@ -247,7 +247,7 @@ void tst_IrcMessage::testEncoding()
     if (!supported)
         QTest::ignoreMessage(QtWarningMsg, "IrcMessage::setEncoding(): unsupported encoding \"" + encoding + "\" ");
 
-    IrcMessage msg(0);
+    IrcMessage msg(nullptr);
     msg.setEncoding(encoding);
     QCOMPARE(msg.encoding(), actual);
 }
@@ -792,8 +792,13 @@ void tst_IrcMessage::testModeMessage()
     QFETCH(QString, mode);
     QFETCH(QString, argument);
 
+#if (QT_VERSION) >= (QT_VERSION_CHECK(5, 14, 0))
+    const QString arg = argument.split(" ", Qt::SkipEmptyParts).value(0);
+    const QStringList args = argument.split(" ", Qt::SkipEmptyParts);
+#else
     const QString arg = argument.split(" ", QString::SkipEmptyParts).value(0);
     const QStringList args = argument.split(" ", QString::SkipEmptyParts);
+#endif
 
     IrcConnection connection;
     IrcMessage* message = IrcMessage::fromData(data, &connection);
@@ -1133,7 +1138,7 @@ void tst_IrcMessage::testClone()
 
 void tst_IrcMessage::testNullConnection()
 {
-    IrcMessage* pm = IrcMessage::fromData(":nick!ident@host PRIVMSG me :hello", 0);
+    IrcMessage* pm = IrcMessage::fromData(":nick!ident@host PRIVMSG me :hello", nullptr);
     QCOMPARE(pm->type(), IrcMessage::Private);
     QCOMPARE(pm->property("target").toString(), QString("me"));
     QVERIFY(pm->property("statusPrefix").toString().isEmpty());
@@ -1141,7 +1146,7 @@ void tst_IrcMessage::testNullConnection()
     QCOMPARE(pm->flags(), IrcMessage::None);
     delete pm;
 
-    IrcMessage* nm = IrcMessage::fromData(":nick!ident@host NOTICE me :hello", 0);
+    IrcMessage* nm = IrcMessage::fromData(":nick!ident@host NOTICE me :hello", nullptr);
     QCOMPARE(nm->type(), IrcMessage::Notice);
     QCOMPARE(nm->property("target").toString(), QString("me"));
     QVERIFY(nm->property("statusPrefix").toString().isEmpty());
@@ -1155,11 +1160,11 @@ void tst_IrcMessage::testDebug()
     QString str;
     QDebug dbg(&str);
 
-    dbg << static_cast<IrcMessage*>(0);
+    dbg << static_cast<IrcMessage*>(nullptr);
     QCOMPARE(str.trimmed(), QString::fromLatin1("IrcMessage(0x0)"));
     str.clear();
 
-    IrcMessage message(0);
+    IrcMessage message(nullptr);
     dbg << &message;
     QVERIFY(QRegExp("IrcMessage\\(0x[0-9A-Fa-f]+, flags=\\(None\\)\\) ").exactMatch(str));
     str.clear();

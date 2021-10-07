@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 The Communi Project
+ * Copyright (C) 2008-2020 The Communi Project
  *
  * This test is free, and not covered by the BSD license. There is no
  * restriction applied to their modification, redistribution, using and so on.
@@ -17,6 +17,12 @@
 #ifdef Q_OS_LINUX
 #include "ircnetwork_p.h"
 #endif // Q_OS_LINUX
+
+#if QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
+namespace Qt {
+    const QString::SplitBehavior SkipEmptyParts = QString::SkipEmptyParts;
+}
+#endif
 
 class tst_IrcNetwork : public tst_IrcClientServer
 {
@@ -92,9 +98,9 @@ void tst_IrcNetwork::testInfo()
     QVERIFY(network->isInitialized());
 
     QCOMPARE(network->name(), name);
-    QCOMPARE(network->modes(), modes.split("", QString::SkipEmptyParts));
-    QCOMPARE(network->prefixes(), prefixes.split("", QString::SkipEmptyParts));
-    QCOMPARE(network->channelTypes(), channelTypes.split("", QString::SkipEmptyParts));
+    QCOMPARE(network->modes(), modes.split("", Qt::SkipEmptyParts));
+    QCOMPARE(network->prefixes(), prefixes.split("", Qt::SkipEmptyParts));
+    QCOMPARE(network->channelTypes(), channelTypes.split("", Qt::SkipEmptyParts));
 
     QCOMPARE(network->prefixes().count(), network->modes().count());
     for (int i = 0; i < network->prefixes().count(); ++i) {
@@ -166,7 +172,7 @@ void tst_IrcNetwork::testInfo()
         for (int i = IrcCommand::Admin; i <= IrcCommand::Whowas; ++i) {
             if (i != IrcCommand::Custom) {
                 command.setType(static_cast<IrcCommand::Type>(i));
-                QString cmd = command.toString().split(" ", QString::SkipEmptyParts).value(0);
+                QString cmd = command.toString().split(" ", Qt::SkipEmptyParts).value(0);
                 if (network->targetLimit(cmd) != -1)
                     limited = true;
             }
@@ -181,17 +187,17 @@ void tst_IrcNetwork::testInfo()
     bool defaultModes = network->modes() == IrcConnection().network()->modes();
     QCOMPARE(modesSpy.count(), defaultModes ? 0 : 1);
     if (!defaultModes)
-        QCOMPARE(modesSpy.first().first().toStringList(), modes.split("", QString::SkipEmptyParts));
+        QCOMPARE(modesSpy.first().first().toStringList(), modes.split("", Qt::SkipEmptyParts));
 
     bool defaultPrefixes = network->prefixes() == IrcConnection().network()->prefixes();
     QCOMPARE(prefixesSpy.count(), defaultPrefixes ? 0 : 1);
     if (!defaultPrefixes)
-        QCOMPARE(prefixesSpy.first().first().toStringList(), prefixes.split("", QString::SkipEmptyParts));
+        QCOMPARE(prefixesSpy.first().first().toStringList(), prefixes.split("", Qt::SkipEmptyParts));
 
     bool defaultTypes = network->channelTypes() == IrcConnection().network()->channelTypes();
     QCOMPARE(channelTypesSpy.count(), defaultTypes ? 0 : 1);
     if (!defaultTypes)
-        QCOMPARE(channelTypesSpy.first().first().toStringList(), channelTypes.split("", QString::SkipEmptyParts));
+        QCOMPARE(channelTypesSpy.first().first().toStringList(), channelTypes.split("", Qt::SkipEmptyParts));
 }
 
 void tst_IrcNetwork::testCapabilities_data()
@@ -261,9 +267,15 @@ void tst_IrcNetwork::testCapabilities_data()
                                << QString("acksticky"); // active
 }
 
+static QStringList sorted(QStringList lst)
+{
+    std::sort(lst.begin(), lst.end());
+    return lst;
+}
+
 static bool equalCaps(const QString& left, const QString& right)
 {
-    return left.split(" ", QString::SkipEmptyParts).toSet() == right.split(" ", QString::SkipEmptyParts).toSet();
+    return sorted(left.split(" ", Qt::SkipEmptyParts)) == sorted(right.split(" ", Qt::SkipEmptyParts));
 }
 
 void tst_IrcNetwork::testCapabilities()
@@ -294,14 +306,14 @@ void tst_IrcNetwork::testCapabilities()
     int requestingCount = 0;
 
     if (!requestedCaps.isEmpty()) {
-        network->setRequestedCapabilities(requestedCaps.split(" ", QString::SkipEmptyParts));
+        network->setRequestedCapabilities(requestedCaps.split(" ", Qt::SkipEmptyParts));
         ++requestedCount;
     }
     QCOMPARE(requestedSpy.count(), requestedCount);
 
-    foreach (const QString& cap, availableCaps.split(" ", QString::SkipEmptyParts))
+    foreach (const QString& cap, availableCaps.split(" ", Qt::SkipEmptyParts))
         QVERIFY(!network->hasCapability(cap));
-    foreach (const QString& cap, activeCaps.split(" ", QString::SkipEmptyParts))
+    foreach (const QString& cap, activeCaps.split(" ", Qt::SkipEmptyParts))
         QVERIFY(!network->isCapable(cap));
 
     connection->open();
@@ -316,9 +328,9 @@ void tst_IrcNetwork::testCapabilities()
     QCOMPARE(availableSpy.count(), availableCount);
     QCOMPARE(requestingSpy.count(), requestingCount);
 
-    foreach (const QString& cap, availableCaps.split(" ", QString::SkipEmptyParts))
+    foreach (const QString& cap, availableCaps.split(" ", Qt::SkipEmptyParts))
         QVERIFY(network->hasCapability(cap));
-    foreach (const QString& cap, activeCaps.split(" ", QString::SkipEmptyParts))
+    foreach (const QString& cap, activeCaps.split(" ", Qt::SkipEmptyParts))
         QVERIFY(!network->isCapable(cap));
 
     if (!ackedCaps.isEmpty()) {
@@ -327,9 +339,9 @@ void tst_IrcNetwork::testCapabilities()
     }
     QCOMPARE(activeSpy.count(), activeCount);
 
-    foreach (const QString& cap, availableCaps.split(" ", QString::SkipEmptyParts))
+    foreach (const QString& cap, availableCaps.split(" ", Qt::SkipEmptyParts))
         QVERIFY(network->hasCapability(cap));
-    foreach (const QString& cap, activeCaps.split(" ", QString::SkipEmptyParts))
+    foreach (const QString& cap, activeCaps.split(" ", Qt::SkipEmptyParts))
         QVERIFY(network->isCapable(cap));
 
     if (!nakedCaps.isEmpty())
@@ -353,14 +365,14 @@ void tst_IrcNetwork::testCapabilities()
     QCOMPARE(availableSpy.count(), availableCount);
     QCOMPARE(activeSpy.count(), activeCount);
 
-    foreach (const QString& cap, availableCaps.split(" ", QString::SkipEmptyParts))
+    foreach (const QString& cap, availableCaps.split(" ", Qt::SkipEmptyParts))
         QVERIFY(network->hasCapability(cap));
-    foreach (const QString& cap, activeCaps.split(" ", QString::SkipEmptyParts))
+    foreach (const QString& cap, activeCaps.split(" ", Qt::SkipEmptyParts))
         QVERIFY(network->isCapable(cap));
 
     // -> CLEAR
     QString clearCaps;
-    foreach (const QString& cap, activeCaps.split(" ", QString::SkipEmptyParts))
+    foreach (const QString& cap, activeCaps.split(" ", Qt::SkipEmptyParts))
         clearCaps += QString("-") + cap;
     QVERIFY(waitForWritten(":irc.ser.ver CAP jpnurmi ACK :" + clearCaps.toUtf8()));
 
@@ -406,7 +418,7 @@ void tst_IrcNetwork::testDebug()
     QString str;
     QDebug dbg(&str);
 
-    dbg << static_cast<IrcNetwork*>(0);
+    dbg << static_cast<IrcNetwork*>(nullptr);
     QCOMPARE(str.trimmed(), QString::fromLatin1("IrcNetwork(0x0)"));
     str.clear();
 

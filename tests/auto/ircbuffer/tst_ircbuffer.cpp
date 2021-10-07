@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 The Communi Project
+ * Copyright (C) 2008-2020 The Communi Project
  *
  * This test is free, and not covered by the BSD license. There is no
  * restriction applied to their modification, redistribution, using and so on.
@@ -128,10 +128,10 @@ void tst_IrcBuffer::testReceive()
     QSignalSpy spy(&buffer, SIGNAL(messageReceived(IrcMessage*)));
     QVERIFY(spy.isValid());
 
-    buffer.receiveMessage(0);
+    buffer.receiveMessage(nullptr);
     QCOMPARE(spy.count(), 0);
 
-    IrcMessage msg(0);
+    IrcMessage msg(nullptr);
     buffer.receiveMessage(&msg);
     QCOMPARE(spy.count(), 1);
     QCOMPARE(spy.last().at(0).value<IrcMessage*>(), &msg);
@@ -142,7 +142,7 @@ void tst_IrcBuffer::testDebug()
     QString str;
     QDebug dbg(&str);
 
-    dbg << static_cast<IrcBuffer*>(0);
+    dbg << static_cast<IrcBuffer*>(nullptr);
     QCOMPARE(str.trimmed(), QString::fromLatin1("IrcBuffer(0x0)"));
     str.clear();
 
@@ -190,8 +190,8 @@ class TestCommandFilter : public QObject, public IrcCommandFilter
     Q_INTERFACES(IrcCommandFilter)
 
 public:
-    TestCommandFilter(IrcConnection* connection) : lastCommand(0) { connection->installCommandFilter(this); }
-    bool commandFilter(IrcCommand *command) { lastCommand = command; return true; }
+    TestCommandFilter(IrcConnection* connection) : lastCommand(nullptr) { connection->installCommandFilter(this); }
+    bool commandFilter(IrcCommand *command) override { lastCommand = command; return true; }
     IrcCommand* lastCommand;
 };
 

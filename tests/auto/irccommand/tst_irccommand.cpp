@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 The Communi Project
+ * Copyright (C) 2008-2020 The Communi Project
  *
  * This test is free, and not covered by the BSD license. There is no
  * restriction applied to their modification, redistribution, using and so on.
@@ -135,7 +135,7 @@ void tst_IrcCommand::testConnection()
     QCOMPARE(command.connection(), connection);
     QCOMPARE(command.network(), connection->network());
 
-    command.setParent(0);
+    command.setParent(nullptr);
     delete connection;
     QVERIFY(!command.connection());
     QVERIFY(!command.network());
@@ -547,7 +547,7 @@ void tst_IrcCommand::testDebug()
     QString str;
     QDebug dbg(&str);
 
-    dbg << static_cast<IrcCommand*>(0);
+    dbg << static_cast<IrcCommand*>(nullptr);
     QCOMPARE(str.trimmed(), QString::fromLatin1("IrcCommand(0x0)"));
     str.clear();
 

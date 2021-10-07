@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2008-2016 The Communi Project
+  Copyright (C) 2008-2020 The Communi Project
 
   You may use this file under the terms of BSD license as follows:
 
@@ -82,7 +82,7 @@
 
     \sa Irc::version()
  */
-#define IRC_VERSION 0x030500
+#define IRC_VERSION 0x030600
 
 /*!
     \def IRC_VERSION_STR
@@ -92,7 +92,7 @@
 
     \sa Irc::version()
  */
-#define IRC_VERSION_STR "3.5.0"
+#define IRC_VERSION_STR "3.6.0"
 
 #ifdef IRC_NAMESPACE
 
